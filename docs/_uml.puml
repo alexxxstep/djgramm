@@ -1,0 +1,95 @@
+@startuml djgramm
+
+' Налаштування стилю
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+}
+
+' Класи
+class User {
+  +Integer id
+  +String email
+  +String username
+  +String first_name
+  +String last_name
+  +Boolean is_staff
+  +Boolean is_active
+  +Boolean is_email_verified
+  +DateTime date_joined
+  --
+  +get_full_name()
+}
+
+note right of User
+  AbstractUser
+  USERNAME_FIELD = email
+  Verification handled in Views
+end note
+
+class Profile {
+  +Integer id
+  +Integer user_id
+  +Text bio
+  +ImageField avatar
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +get_avatar_url()
+}
+
+note right of Profile
+  One-to-One with User
+  Full name removed (DRY)
+end note
+
+class Post {
+  +Integer id
+  +Integer author_id
+  +Text caption
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +get_likes_count()
+  +is_liked_by(user)
+}
+
+class PostImage {
+  +Integer id
+  +Integer post_id
+  +ImageField image
+  +Integer order
+  +DateTime created_at
+}
+
+class Tag {
+  +Integer id
+  +String name
+  +SlugField slug
+  +DateTime created_at
+  --
+  +save()
+}
+
+class Like {
+  +Integer id
+  +Integer user_id
+  +Integer post_id
+  +DateTime created_at
+}
+
+note right of Like
+  unique_together:
+  [user, post]
+end note
+
+' Зв'язки
+User "1" -- "1" Profile : has >
+User "1" -- "*" Post : authors >
+Post "1" *-- "*" PostImage : contains
+Post "*" -- "*" Tag : tagged with
+User "*" -- "*" Post : likes >
+(User, Post) .. Like
+
+@enduml
