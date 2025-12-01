@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile | DJGramm{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h1 class="text-xl font-semibold mb-6">Edit Profile</h1>
+
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+
+            <!-- Avatar -->
+            <div class="flex items-center space-x-6">
+                <div class="flex-shrink-0">
+                    {% if user.profile.avatar %}
+                    <img src="{{ user.profile.avatar.url }}"
+                         alt="{{ user.username }}"
+                         class="w-20 h-20 rounded-full object-cover">
+                    {% else %}
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-2xl font-bold">
+                        {{ user.username|first|upper }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="font-semibold">{{ user.username }}</p>
+                    <label class="text-primary text-sm font-semibold cursor-pointer hover:underline">
+                        Change Profile Photo
+                        <input type="file" name="avatar" accept="image/*" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Full Name -->
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">Name</label>
+                <input type="text" name="full_name" value="{{ form.full_name.value|default:'' }}"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                       placeholder="Your full name">
+            </div>
+
+            <!-- Bio -->
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">Bio</label>
+                <textarea name="bio" rows="4"
+                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                          placeholder="Tell us about yourself...">{{ form.bio.value|default:'' }}</textarea>
+                <p class="text-gray-400 text-sm mt-1">{{ form.bio.value|length|default:0 }}/500</p>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex space-x-4">
+                <button type="submit"
+                        class="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">
+                    Save Changes
+                </button>
+                <a href="{% url 'profile' username=user.username %}"
+                   class="flex-1 text-center border border-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
