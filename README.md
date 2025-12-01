@@ -143,6 +143,11 @@ djgramm/
 └── docs/                # Documentation
 ```
 
+## Documentation
+
+- [Implementation Plan](docs/TASK12_PLAN.md) — детальний план реалізації проекту з усіма фазами
+- [UML Schema](docs/UML_SCHEMA.md) — діаграма моделей даних
+
 ## API Endpoints
 
 | URL                    | Method   | Description        |
