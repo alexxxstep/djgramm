@@ -11,7 +11,8 @@ variables:
   POSTGRES_PASSWORD: postgres
   DATABASE_URL: "postgres://postgres:postgres@postgres:5432/djgramm_test"
   SECRET_KEY: "test-secret-key-for-ci"
-  DEBUG: "False"
+  DEBUG: "True"
+  TESTING: "True"
   ALLOWED_HOSTS: "localhost,127.0.0.1"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
@@ -93,6 +94,8 @@ build:docker:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "dev_01"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # Build and push to registry (optional, for deployment)
@@ -109,12 +112,14 @@ build:push:
     - docker build -t $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA} -f docker/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}
     - |
-      if [ "$CI_COMMIT_BRANCH" == "main" ] || [ "$CI_COMMIT_BRANCH" == "master" ]; then
+      if [ "$CI_COMMIT_BRANCH" == "main" ] || [ "$CI_COMMIT_BRANCH" == "master" ] || [ "$CI_COMMIT_BRANCH" == "develop" ] || [ "$CI_COMMIT_BRANCH" == "dev_01" ]; then
         docker tag $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA} $CI_REGISTRY_IMAGE:latest
         docker push $CI_REGISTRY_IMAGE:latest
       fi
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "dev_01"
   when: manual
   allow_failure: true
