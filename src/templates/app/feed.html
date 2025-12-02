@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load app_tags %}
 
 {% block title %}Feed | DJGramm{% endblock %}
 
@@ -76,17 +77,8 @@
                     {% if post.caption %}
                     <p class="text-gray-800">
                         <a href="{% url 'profile' username=post.author.username %}" class="font-semibold">{{ post.author.username }}</a>
-                        {{ post.caption|truncatewords:20 }}
+                        {{ post.caption|linkify_hashtags|truncatewords:20 }}
                     </p>
-                    {% endif %}
-
-                    <!-- Tags -->
-                    {% if post.tags.all %}
-                    <div class="mt-2 flex flex-wrap gap-1">
-                        {% for tag in post.tags.all %}
-                        <a href="{% url 'tag_posts' slug=tag.slug %}" class="text-secondary hover:underline">#{{ tag.name }}</a>
-                        {% endfor %}
-                    </div>
                     {% endif %}
 
                     <!-- Time -->

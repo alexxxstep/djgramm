@@ -11,12 +11,12 @@ echo "PostgreSQL is ready!"
 
 # Run migrations
 echo "Running migrations..."
-python manage.py migrate --noinput
+uv run python manage.py migrate --noinput
 
 # Collect static files (only in production)
 if [ "$DEBUG" != "True" ]; then
     echo "Collecting static files..."
-    python manage.py collectstatic --noinput
+    uv run python manage.py collectstatic --noinput
 fi
 
 # Execute the main command

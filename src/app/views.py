@@ -16,6 +16,7 @@ from django.views.generic import (
 
 from .forms import PostForm, PostImageFormSet, ProfileForm, RegistrationForm
 from .models import Like, Post, Profile, Tag, User
+from .services import sync_post_tags
 
 # =============================================================================
 # Feed
@@ -169,12 +170,15 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        """Save post and images."""
+        """Save post and images, sync tags."""
         context = self.get_context_data()
         image_formset = context["image_formset"]
 
         form.instance.author = self.request.user
         self.object = form.save()
+
+        # Sync tags from caption
+        sync_post_tags(self.object, form.cleaned_data["caption"])
 
         if image_formset.is_valid():
             image_formset.instance = self.object
@@ -209,11 +213,14 @@ class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        """Save post and images."""
+        """Save post and images, sync tags."""
         context = self.get_context_data()
         image_formset = context["image_formset"]
 
         self.object = form.save()
+
+        # Sync tags from caption
+        sync_post_tags(self.object, form.cleaned_data["caption"])
 
         if image_formset.is_valid():
             image_formset.save()

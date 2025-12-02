@@ -1,9 +1,13 @@
 """Business logic services for DJGramm."""
 
+import re
 from io import BytesIO
 
 from django.core.files.base import ContentFile
+from django.utils.text import slugify
 from PIL import Image
+
+from .models import Tag
 
 # Allowed image types
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -100,3 +104,85 @@ def process_uploaded_image(file, max_dimension: int = 1080) -> ContentFile:
         buffer.seek(0)
 
         return ContentFile(buffer.getvalue())
+
+
+# =============================================================================
+# Tag Extraction Services
+# =============================================================================
+
+
+def extract_hashtags(text: str) -> set[str]:
+    """
+    Extract hashtags from text.
+
+    Examples:
+        "#travel #nature" -> {"travel", "nature"}
+        "Check out #sunset photos!" -> {"sunset"}
+        "#tag1#tag2" -> {"tag1", "tag2"}
+
+    Args:
+        text: Text containing hashtags
+
+    Returns:
+        Set of tag names (lowercase, without #)
+    """
+    if not text:
+        return set()
+
+    # Pattern: # followed by word characters (letters, numbers, underscore)
+    pattern = r"#(\w+)"
+    matches = re.findall(pattern, text)
+
+    # Normalize: lowercase, remove duplicates, filter empty
+    tags = {tag.lower().strip() for tag in matches if tag.strip()}
+
+    return tags
+
+
+def create_or_get_tags(tag_names: set[str]) -> list[Tag]:
+    """
+    Create Tag objects if they don't exist, return all tags.
+
+    Args:
+        tag_names: Set of tag names (without #)
+
+    Returns:
+        List of Tag objects
+    """
+    tags = []
+
+    for name in tag_names:
+        # Skip empty or too long names
+        if not name or len(name) > 50:
+            continue
+
+        # Generate slug
+        slug = slugify(name)
+        if not slug:
+            continue
+
+        # Get or create tag
+        tag, created = Tag.objects.get_or_create(
+            slug=slug, defaults={"name": name}
+        )
+        tags.append(tag)
+
+    return tags
+
+
+def sync_post_tags(post, caption: str) -> None:
+    """
+    Extract hashtags from caption and sync with post.tags.
+
+    Args:
+        post: Post instance
+        caption: Post caption text
+    """
+    # Extract hashtags
+    tag_names = extract_hashtags(caption)
+
+    # Create/get tags
+    tags = create_or_get_tags(tag_names)
+
+    # Sync with post (replace all tags)
+    post.tags.set(tags)
