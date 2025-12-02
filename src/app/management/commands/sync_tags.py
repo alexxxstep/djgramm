@@ -46,9 +46,7 @@ class Command(BaseCommand):
 
         if dry_run:
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"\nWould sync tags for {synced} posts"
-                )
+                self.style.SUCCESS(f"\nWould sync tags for {synced} posts")
             )
         else:
             self.stdout.write(
@@ -56,4 +54,3 @@ class Command(BaseCommand):
                     f"\nSuccessfully synced tags for {synced} posts"
                 )
             )
-

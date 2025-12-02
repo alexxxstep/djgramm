@@ -122,7 +122,9 @@ class TestProfileView:
 
     def test_profile_view(self, client, user):
         """Test viewing a user profile."""
-        response = client.get(reverse("profile", kwargs={"username": user.username}))
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
         assert response.status_code == 200
         assert user.username in response.content.decode()
 
@@ -136,7 +138,9 @@ class TestProfileView:
 
     def test_profile_not_found(self, client, db):
         """Test 404 for non-existent user."""
-        response = client.get(reverse("profile", kwargs={"username": "nonexistent"}))
+        response = client.get(
+            reverse("profile", kwargs={"username": "nonexistent"})
+        )
         assert response.status_code == 404
 
 
@@ -208,7 +212,9 @@ class TestPostCreateView:
             },
         )
         assert response.status_code == 302  # Redirect after success
-        assert Post.objects.filter(author=user, caption="New post caption").exists()
+        assert Post.objects.filter(
+            author=user, caption="New post caption"
+        ).exists()
 
 
 class TestPostUpdateView:
@@ -319,5 +325,7 @@ class TestTagPostsView:
 
     def test_tag_not_found(self, client, db):
         """Test 404 for non-existent tag."""
-        response = client.get(reverse("tag_posts", kwargs={"slug": "nonexistent"}))
+        response = client.get(
+            reverse("tag_posts", kwargs={"slug": "nonexistent"})
+        )
         assert response.status_code == 404

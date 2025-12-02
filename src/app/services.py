@@ -33,7 +33,9 @@ def validate_image(file) -> tuple[bool, str]:
 
     # Check content type
     if file.content_type not in ALLOWED_IMAGE_TYPES:
-        allowed = ", ".join(t.split("/")[1].upper() for t in ALLOWED_IMAGE_TYPES)
+        allowed = ", ".join(
+            t.split("/")[1].upper() for t in ALLOWED_IMAGE_TYPES
+        )
         return False, f"Invalid image type. Allowed types: {allowed}."
 
     # Try to open as image to verify it's valid

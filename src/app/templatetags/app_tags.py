@@ -36,4 +36,3 @@ def linkify_hashtags(text):
         )
 
     return mark_safe(re.sub(pattern, replace_hashtag, text))
-
