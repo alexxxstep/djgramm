@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
-from app.models import Tag
 from app.services import (
     ALLOWED_IMAGE_TYPES,
     MAX_IMAGE_SIZE,

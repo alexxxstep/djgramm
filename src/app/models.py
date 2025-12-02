@@ -21,7 +21,9 @@ class User(AbstractUser):
 class Profile(models.Model):
     """User profile with additional information."""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    user = models.OneToOneField(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="profile"
+    )
     full_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(max_length=500, blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
@@ -50,7 +52,9 @@ class Tag(models.Model):
 class Post(models.Model):
     """User post with images."""
 
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
+    author = models.ForeignKey(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="posts"
+    )
     caption = models.TextField(max_length=2200, blank=True)
     tags = models.ManyToManyField(Tag, related_name="posts", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -69,7 +73,9 @@ class Post(models.Model):
 class PostImage(models.Model):
     """Image attached to a post."""
 
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="images")
+    post = models.ForeignKey(  # fmt: skip
+        Post, on_delete=models.CASCADE, related_name="images"
+    )
     image = models.ImageField(upload_to="posts/")
     order = models.PositiveIntegerField(default=0)
 
@@ -83,8 +89,12 @@ class PostImage(models.Model):
 class Like(models.Model):
     """Like on a post."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="likes")
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="likes")
+    user = models.ForeignKey(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="likes"
+    )
+    post = models.ForeignKey(  # fmt: skip
+        Post, on_delete=models.CASCADE, related_name="likes"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
