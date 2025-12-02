@@ -21,9 +21,10 @@ env:
   POSTGRES_PASSWORD: postgres
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/djgramm_test
   SECRET_KEY: test-secret-key-for-ci
-  DEBUG: "False"
+  DEBUG: 'True'
+  TESTING: 'True'
   ALLOWED_HOSTS: localhost,127.0.0.1
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: '3.12'
 
 jobs:
   # =============================================================================
@@ -264,4 +265,3 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
