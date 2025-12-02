@@ -48,7 +48,10 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "password",
+                    models.CharField(max_length=128, verbose_name="password"),
+                ),
                 (
                     "last_login",
                     models.DateTimeField(
@@ -109,7 +112,8 @@ class Migration(migrations.Migration):
                 (
                     "date_joined",
                     models.DateTimeField(
-                        default=django.utils.timezone.now, verbose_name="date joined"
+                        default=django.utils.timezone.now,
+                        verbose_name="date joined",
                     ),
                 ),
                 ("email", models.EmailField(max_length=254, unique=True)),
@@ -221,7 +225,10 @@ class Migration(migrations.Migration):
                 ),
                 ("full_name", models.CharField(blank=True, max_length=100)),
                 ("bio", models.TextField(blank=True, max_length=500)),
-                ("avatar", models.ImageField(blank=True, upload_to="avatars/")),
+                (
+                    "avatar",
+                    models.ImageField(blank=True, upload_to="avatars/"),
+                ),
                 (
                     "user",
                     models.OneToOneField(

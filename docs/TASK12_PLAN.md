@@ -122,6 +122,20 @@ djgramm/
 
 ---
 
+### Фаза 5.5: Автоматичне витягування тегів ✅
+**Тривалість:** 0.5 дня | **Статус:** Завершено
+
+- [x] Функція `extract_hashtags()` для парсингу хештегів з caption
+- [x] Функція `create_or_get_tags()` для створення/отримання тегів
+- [x] Функція `sync_post_tags()` для синхронізації тегів з постом
+- [x] Інтеграція в `PostCreateView` та `PostUpdateView`
+- [x] Template tag `linkify_hashtags` для підсвітки хештегів у шаблонах
+- [x] Management command `sync_tags` для синхронізації існуючих постів
+
+**Зроблено:** Автоматичне витягування тегів з хештегів (`#tag`) при створенні/редагуванні посту, клікабельні хештеги в UI, команда для синхронізації старих постів
+
+---
+
 ### Фаза 6: Шаблони та UI ✅
 **Тривалість:** 2 дні | **Статус:** Завершено
 
@@ -151,11 +165,11 @@ djgramm/
 - [x] Fixtures в `conftest.py`
 - [x] Тести моделей
 - [x] Тести views
-- [x] Тести сервісів
+- [x] Тести сервісів (включаючи tag extraction)
 
 **Ціль:** 80%+ покриття | **Результат:** 97% coverage ✅
 
-**Зроблено:** 74 тести (25 models + 35 views + 14 services), 12 fixtures
+**Зроблено:** 85+ тести (25 models + 35 views + 25 services включаючи tag extraction), 12 fixtures
 
 ---
 
@@ -222,6 +236,8 @@ DATABASE_URL=postgres://user:pass@db:5432/djgramm
 3. **CBV** — Class-Based Views для стандартних операцій
 4. **FBV** — Function-Based для простих дій (like toggle)
 5. **Signals** — автоматичне створення Profile
+6. **Automatic Tag Extraction** — хештеги з caption автоматично стають тегами
+7. **Template Tags** — кастомні фільтри для підсвітки хештегів
 
 ---
 
@@ -229,15 +245,45 @@ DATABASE_URL=postgres://user:pass@db:5432/djgramm
 
 **Проект DJGramm повністю завершено!**
 
-| Метрика          | Значення          |
-| ---------------- | ----------------- |
-| Моделей          | 6                 |
-| Views            | 12                |
-| Шаблонів         | 11                |
-| Тестів           | 74                |
-| Coverage         | 97%               |
-| CI/CD jobs       | 5                 |
-| Seed users       | 21                |
-| Seed posts       | 102               |
+| Метрика              | Значення          |
+| -------------------- | ----------------- |
+| Моделей              | 6                 |
+| Views                | 12                |
+| Шаблонів             | 11                |
+| Template Tags        | 1 (linkify_hashtags) |
+| Management Commands  | 1 (sync_tags)     |
+| Тестів               | 85+               |
+| Coverage             | 97%               |
+| CI/CD jobs           | 5                 |
+| Seed users           | 21                |
+| Seed posts           | 102               |
+| Tag Extraction       | ✅ Автоматично    |
 
 **Готовий до production deploy!**
+
+---
+
+## Додаткові функції
+
+### Автоматичне витягування тегів
+
+При створенні або редагуванні посту з хештегами в caption (наприклад, `"Beautiful #sunset #travel photos!"`):
+
+1. Хештеги автоматично витягуються з тексту
+2. Створюються `Tag` об'єкти якщо не існують
+3. Теги прив'язуються до посту через M2M
+4. В UI хештеги стають клікабельними посиланнями на `/tag/<slug>/`
+
+**Management Command:**
+```bash
+# Синхронізувати теги для всіх існуючих постів
+python manage.py sync_tags
+
+# Перевірити що буде синхронізовано (без змін)
+python manage.py sync_tags --dry-run
+```
+
+**Файли:**
+- `src/app/services.py` — `extract_hashtags()`, `create_or_get_tags()`, `sync_post_tags()`
+- `src/app/templatetags/app_tags.py` — `linkify_hashtags` filter
+- `src/app/management/commands/sync_tags.py` — management command

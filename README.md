@@ -55,6 +55,9 @@ uv run python manage.py createsuperuser
 
 ```bash
 uv run python ../scripts/seed_data.py
+
+# Sync tags from existing posts (if posts were created before tag extraction feature)
+uv run python manage.py sync_tags
 ```
 
 ### 6. Run Development Server
@@ -72,6 +75,16 @@ Open: http://127.0.0.1:9000/
 docker compose up --build
 
 # Access: http://localhost:9000
+
+# View logs
+docker compose logs -f web
+
+# Stop
+docker compose down
+
+# Execute commands in container
+docker compose exec web uv run python manage.py createsuperuser
+docker compose exec web uv run python manage.py sync_tags
 ```
 
 ## Testing
@@ -113,10 +126,13 @@ SECURE_SSL_REDIRECT=True
 docker compose -f docker-compose.prod.yml up -d --build
 
 # Run migrations
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml exec web uv run python manage.py migrate
 
 # Create superuser
-docker compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec web uv run python manage.py createsuperuser
+
+# Sync tags for existing posts (if needed)
+docker compose -f docker-compose.prod.yml exec web uv run python manage.py sync_tags
 ```
 
 ### 3. SSL Certificates
@@ -128,6 +144,26 @@ Place your SSL certificates in `docker/certs/`:
 
 Then uncomment HTTPS configuration in `docker/nginx.conf`.
 
+## Features
+
+- **User Authentication** — Email-based registration and login
+- **Photo Posts** — Upload multiple images per post with captions
+- **Automatic Tag Extraction** — Hashtags in captions (`#tag`) are automatically extracted and linked
+- **Likes** — AJAX-powered like/unlike functionality
+- **User Profiles** — View and edit user profiles
+- **Tag Filtering** — Browse posts by tags
+- **Admin Panel** — Full Django admin interface
+
+### Automatic Tag Extraction
+
+When creating or editing a post, hashtags in the caption are automatically extracted and converted to tags:
+
+- **Example:** `"Beautiful #sunset #travel photos!"`
+- **Result:** Tags `sunset` and `travel` are created (if they don't exist) and linked to the post
+- **UI:** Hashtags become clickable links that filter posts by tag
+
+**For existing posts:** Run `python manage.py sync_tags` to extract tags from posts created before this feature was implemented.
+
 ## Project Structure
 
 ```
@@ -135,6 +171,8 @@ djgramm/
 ├── src/
 │   ├── config/          # Django settings
 │   ├── app/             # Main application
+│   │   ├── management/  # Management commands
+│   │   └── templatetags/ # Custom template tags
 │   ├── templates/       # HTML templates
 │   └── static/          # Static files
 ├── tests/               # Pytest tests
@@ -143,10 +181,21 @@ djgramm/
 └── docs/                # Documentation
 ```
 
+## Management Commands
+
+```bash
+# Sync tags from captions for all existing posts
+uv run python manage.py sync_tags
+
+# Dry run (show what would be synced)
+uv run python manage.py sync_tags --dry-run
+```
+
 ## Documentation
 
 - [Implementation Plan](docs/TASK12_PLAN.md) — детальний план реалізації проекту з усіма фазами
 - [UML Schema](docs/UML_SCHEMA.md) — діаграма моделей даних
+- [Tag Extraction Plan](.cursor/TAG_EXTRACTION_PLAN.md) — план автоматичного витягування тегів
 
 ## API Endpoints
 

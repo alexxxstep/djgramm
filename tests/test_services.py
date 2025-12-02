@@ -9,8 +9,11 @@ from PIL import Image
 from app.services import (
     ALLOWED_IMAGE_TYPES,
     MAX_IMAGE_SIZE,
+    create_or_get_tags,
+    extract_hashtags,
     generate_thumbnail,
     process_uploaded_image,
+    sync_post_tags,
     validate_image,
 )
 
@@ -197,3 +200,105 @@ class TestConstants:
     def test_max_image_size(self):
         """Test max image size is 10MB."""
         assert MAX_IMAGE_SIZE == 10 * 1024 * 1024
+
+
+class TestExtractHashtags:
+    """Tests for extract_hashtags function."""
+
+    def test_extract_simple_hashtags(self):
+        """Test extracting simple hashtags."""
+        assert extract_hashtags("#travel #nature") == {"travel", "nature"}
+
+    def test_extract_hashtags_in_text(self):
+        """Test extracting hashtags from text."""
+        assert extract_hashtags("Check out #sunset photos!") == {"sunset"}
+
+    def test_extract_multiple_hashtags(self):
+        """Test extracting multiple hashtags."""
+        assert extract_hashtags("#tag1#tag2") == {"tag1", "tag2"}
+
+    def test_extract_no_hashtags(self):
+        """Test text without hashtags."""
+        assert extract_hashtags("No tags here") == set()
+
+    def test_extract_empty_string(self):
+        """Test empty string."""
+        assert extract_hashtags("") == set()
+
+    def test_extract_case_insensitive(self):
+        """Test that hashtags are case-insensitive."""
+        assert extract_hashtags("#Travel #TRAVEL #travel") == {"travel"}
+
+    def test_extract_with_numbers(self):
+        """Test hashtags with numbers."""
+        assert extract_hashtags("#tag123 #test1") == {"tag123", "test1"}
+
+
+class TestCreateOrGetTags:
+    """Tests for create_or_get_tags function."""
+
+    def test_create_tags(self, db):
+        """Test creating new tags."""
+        tags = create_or_get_tags({"travel", "nature"})
+        assert len(tags) == 2
+        assert all(isinstance(tag, type(tags[0])) for tag in tags)
+
+    def test_get_existing_tags(self, db, tag):
+        """Test getting existing tags."""
+        tags = create_or_get_tags({tag.name})
+        assert len(tags) == 1
+        assert tags[0] == tag
+
+    def test_skip_too_long_names(self, db):
+        """Test skipping tags with names longer than 50 chars."""
+        long_name = "a" * 51
+        tags = create_or_get_tags({long_name})
+        assert len(tags) == 0
+
+    def test_empty_set(self, db):
+        """Test with empty set."""
+        tags = create_or_get_tags(set())
+        assert len(tags) == 0
+
+
+class TestSyncPostTags:
+    """Tests for sync_post_tags function."""
+
+    def test_sync_tags_from_caption(self, db, post):
+        """Test syncing tags from caption."""
+        post.caption = "Check #travel #nature photos"
+        sync_post_tags(post, post.caption)
+
+        assert post.tags.count() == 2
+        assert post.tags.filter(slug="travel").exists()
+        assert post.tags.filter(slug="nature").exists()
+
+    def test_sync_replaces_existing_tags(self, db, post, tag):
+        """Test that sync replaces existing tags."""
+        # Add existing tag
+        post.tags.add(tag)
+
+        # Sync with new caption
+        post.caption = "New #sunset photo"
+        sync_post_tags(post, post.caption)
+
+        # Old tag should be removed
+        assert not post.tags.filter(slug=tag.slug).exists()
+        # New tag should be added
+        assert post.tags.filter(slug="sunset").exists()
+
+    def test_sync_empty_caption(self, db, post, tag):
+        """Test syncing with empty caption removes all tags."""
+        post.tags.add(tag)
+        sync_post_tags(post, "")
+
+        assert post.tags.count() == 0
+
+    def test_sync_case_insensitive(self, db, post):
+        """Test that sync handles case-insensitive hashtags."""
+        post.caption = "#Travel #TRAVEL #travel"
+        sync_post_tags(post, post.caption)
+
+        # Should create only one tag
+        assert post.tags.count() == 1
+        assert post.tags.filter(slug="travel").exists()

@@ -61,7 +61,9 @@ def tag(db):
 @pytest.fixture
 def tags(db):
     """Create multiple tags."""
-    return [Tag.objects.create(name=f"tag{i}", slug=f"tag{i}") for i in range(3)]
+    return [
+        Tag.objects.create(name=f"tag{i}", slug=f"tag{i}") for i in range(3)
+    ]
 
 
 @pytest.fixture

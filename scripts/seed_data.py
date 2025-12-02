@@ -16,16 +16,15 @@ from io import BytesIO
 from pathlib import Path
 
 import django
+from django.core.files.base import ContentFile
+from PIL import Image
+
+from app.models import Like, Post, PostImage, Tag, User
 
 # Setup Django
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
-
-from django.core.files.base import ContentFile
-from PIL import Image
-
-from app.models import Like, Post, PostImage, Tag, User
 
 
 def create_placeholder_image(width=800, height=800, color=None):
@@ -109,7 +108,9 @@ def seed_users(count=20):
             user.save()
             # Update profile
             user.profile.full_name = f"User {i} Name"
-            user.profile.bio = f"Hello! I'm user {i}. I love sharing photos on DJGramm!"
+            user.profile.bio = (
+                f"Hello! I'm user {i}. I love sharing photos on DJGramm!"
+            )
             user.profile.save()
             print(f"  Created user: {username}")
         users.append(user)
@@ -143,7 +144,7 @@ def seed_posts(users, tags, count=100):
         author = random.choice(users)
         post = Post.objects.create(
             author=author,
-            caption=random.choice(captions) + f" #{i+1}",
+            caption=random.choice(captions) + f" #{i + 1}",
         )
 
         # Add 1-3 random tags
