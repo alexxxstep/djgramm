@@ -1,6 +1,7 @@
 # Django settings for DJGramm project
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -103,16 +104,25 @@ AUTH_USER_MODEL = "app.User"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation.MinimumLengthValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation.CommonPasswordValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation.NumericPasswordValidator"
+        ),
     },
 ]
 
@@ -151,7 +161,14 @@ LOGIN_URL = "/login/"
 # =============================================================================
 # Production Security Settings
 # =============================================================================
-if not DEBUG:
+# Check if running tests (pytest sets this automatically)
+TESTING = (
+    "pytest" in sys.modules
+    or "test" in sys.argv
+    or os.environ.get("TESTING") == "True"
+)
+
+if not DEBUG and not TESTING:
     # HTTPS settings
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = (
