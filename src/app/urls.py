@@ -52,6 +52,11 @@ urlpatterns = [
         name="delete_comment",
     ),
     path(
+        "post/<int:pk>/comment/<int:comment_pk>/edit/",
+        views.edit_comment,
+        name="edit_comment",
+    ),
+    path(
         "post/<int:pk>/reorder-images/",
         views.update_image_order,
         name="reorder_images",

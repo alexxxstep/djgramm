@@ -114,40 +114,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% load static %}
 {% if user.is_authenticated %}
-<script>
-document.querySelectorAll('.like-btn').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const postId = this.dataset.postId;
-        try {
-            const response = await fetch(`/post/${postId}/like/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await response.json();
-
-            // Update UI
-            const likesSpan = document.getElementById(`likes-count-${postId}`);
-            const likeBtn = document.getElementById(`like-btn-${postId}`);
-            const svg = likeBtn.querySelector('svg');
-
-            likesSpan.textContent = data.likes_count;
-
-            if (data.liked) {
-                likeBtn.classList.add('text-red-500');
-                svg.setAttribute('fill', 'currentColor');
-            } else {
-                likeBtn.classList.remove('text-red-500');
-                svg.setAttribute('fill', 'none');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    });
-});
-</script>
+<script src="{% static 'js/feed.js' %}"></script>
 {% endif %}
 {% endblock %}

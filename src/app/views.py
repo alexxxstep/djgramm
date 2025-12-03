@@ -1,5 +1,7 @@
 """Views for DJGramm."""
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -13,8 +15,6 @@ from django.views.generic import (
     ListView,
     UpdateView,
 )
-
-import json
 
 from .forms import (
     CommentForm,
@@ -303,7 +303,9 @@ def add_comment(request, pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
+            return JsonResponse(
+                {"error": "Comment cannot be empty"}, status=400
+            )
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -314,19 +316,20 @@ def add_comment(request, pk):
             text=text,
         )
 
+        created_at = comment.created_at.strftime("%b %d, %Y %H:%M")
+        avatar_url = None
+        if comment.author.profile.avatar:
+            avatar_url = comment.author.profile.avatar.url
+
         return JsonResponse(
             {
                 "success": True,
                 "comment": {
                     "id": comment.pk,
                     "author": comment.author.username,
-                    "author_avatar": (
-                        comment.author.profile.avatar.url
-                        if comment.author.profile.avatar
-                        else None
-                    ),
+                    "author_avatar": avatar_url,
                     "text": comment.text,
-                    "created_at": comment.created_at.strftime("%b %d, %Y %H:%M"),
+                    "created_at": created_at,
                 },
                 "comments_count": post.comments.count(),
             }
@@ -358,6 +361,43 @@ def delete_comment(request, pk, comment_pk):
     )
 
 
+@login_required
+def edit_comment(request, pk, comment_pk):
+    """Edit a comment (AJAX endpoint)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST method required"}, status=405)
+
+    comment = get_object_or_404(Comment, pk=comment_pk, post_id=pk)
+
+    # Only comment author can edit
+    if request.user != comment.author:
+        return JsonResponse({"error": "Permission denied"}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        text = data.get("text", "").strip()
+
+        if not text:
+            return JsonResponse(
+                {"error": "Comment cannot be empty"}, status=400
+            )
+
+        if len(text) > 500:
+            return JsonResponse({"error": "Comment too long"}, status=400)
+
+        comment.text = text
+        comment.save()
+
+        return JsonResponse(
+            {
+                "success": True,
+                "text": comment.text,
+            }
+        )
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({"error": "Invalid data"}, status=400)
+
+
 # =============================================================================
 # Image Order (AJAX)
 # =============================================================================
@@ -381,7 +421,9 @@ def update_image_order(request, pk):
 
         # Update order for each image
         for index, image_id in enumerate(order_list):
-            PostImage.objects.filter(pk=image_id, post=post).update(order=index)
+            PostImage.objects.filter(pk=image_id, post=post).update(
+                order=index
+            )
 
         return JsonResponse({"success": True})
     except (json.JSONDecodeError, KeyError):
