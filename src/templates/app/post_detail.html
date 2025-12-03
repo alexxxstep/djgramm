@@ -6,12 +6,49 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
     <article class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden md:flex">
-        <!-- Image(s) -->
-        <div class="md:w-3/5 bg-black flex items-center justify-center">
-            {% if post.images.first %}
-            <img src="{{ post.images.first.image.url }}"
-                 alt="Post by {{ post.author.username }}"
-                 class="w-full max-h-[600px] object-contain">
+        <!-- Image(s) Carousel -->
+        <div class="md:w-3/5 bg-black flex items-center justify-center relative" id="image-carousel">
+            {% if post.images.exists %}
+                {% with images=post.images.all %}
+                <!-- Image Container -->
+                <div class="relative w-full">
+                    {% for image in images %}
+                    <img src="{{ image.image.url }}"
+                         alt="Post by {{ post.author.username }} - Image {{ forloop.counter }}"
+                         class="carousel-image w-full max-h-[600px] object-contain {% if not forloop.first %}hidden{% endif %}"
+                         data-index="{{ forloop.counter0 }}">
+                    {% endfor %}
+                </div>
+
+                {% if images|length > 1 %}
+                <!-- Navigation Arrows -->
+                <button id="prev-btn"
+                        class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all opacity-70 hover:opacity-100 z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <button id="next-btn"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all opacity-70 hover:opacity-100 z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+
+                <!-- Dots Indicator -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+                    {% for image in images %}
+                    <button class="carousel-dot w-2 h-2 rounded-full transition-all {% if forloop.first %}bg-white{% else %}bg-white/50{% endif %}"
+                            data-index="{{ forloop.counter0 }}"></button>
+                    {% endfor %}
+                </div>
+
+                <!-- Image Counter -->
+                <div class="absolute top-4 right-4 bg-black/50 text-white text-sm px-3 py-1 rounded-full z-10">
+                    <span id="current-image">1</span> / {{ images|length }}
+                </div>
+                {% endif %}
+                {% endwith %}
             {% else %}
             <div class="w-full aspect-square flex items-center justify-center text-gray-500">
                 <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,6 +132,7 @@
 
 {% block extra_js %}
 <script>
+// Like button functionality
 document.querySelectorAll('.like-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
         const postId = this.dataset.postId;
@@ -127,5 +165,97 @@ document.querySelectorAll('.like-btn').forEach(btn => {
         }
     });
 });
+
+// Image Carousel functionality
+(function() {
+    const images = document.querySelectorAll('.carousel-image');
+    const dots = document.querySelectorAll('.carousel-dot');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const currentImageSpan = document.getElementById('current-image');
+
+    if (images.length <= 1) return;
+
+    let currentIndex = 0;
+
+    function showImage(index) {
+        // Hide all images
+        images.forEach(img => img.classList.add('hidden'));
+        // Show selected image
+        images[index].classList.remove('hidden');
+
+        // Update dots
+        dots.forEach((dot, i) => {
+            if (i === index) {
+                dot.classList.remove('bg-white/50');
+                dot.classList.add('bg-white');
+            } else {
+                dot.classList.remove('bg-white');
+                dot.classList.add('bg-white/50');
+            }
+        });
+
+        // Update counter
+        if (currentImageSpan) {
+            currentImageSpan.textContent = index + 1;
+        }
+
+        currentIndex = index;
+    }
+
+    function nextImage() {
+        const newIndex = (currentIndex + 1) % images.length;
+        showImage(newIndex);
+    }
+
+    function prevImage() {
+        const newIndex = (currentIndex - 1 + images.length) % images.length;
+        showImage(newIndex);
+    }
+
+    // Event listeners
+    if (nextBtn) nextBtn.addEventListener('click', nextImage);
+    if (prevBtn) prevBtn.addEventListener('click', prevImage);
+
+    // Dots click
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => showImage(index));
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') nextImage();
+        if (e.key === 'ArrowLeft') prevImage();
+    });
+
+    // Touch swipe support
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const carousel = document.getElementById('image-carousel');
+
+    if (carousel) {
+        carousel.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        carousel.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+    }
+
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchStartX - touchEndX;
+
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                nextImage(); // Swipe left = next
+            } else {
+                prevImage(); // Swipe right = prev
+            }
+        }
+    }
+})();
 </script>
 {% endblock %}
