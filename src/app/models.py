@@ -102,3 +102,22 @@ class Like(models.Model):
 
     def __str__(self):
         return f"{self.user.username} likes Post #{self.post_id}"
+
+
+class Comment(models.Model):
+    """Comment on a post."""
+
+    author = models.ForeignKey(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="comments"
+    )
+    post = models.ForeignKey(  # fmt: skip
+        Post, on_delete=models.CASCADE, related_name="comments"
+    )
+    text = models.TextField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]  # Chronological order
+
+    def __str__(self):
+        return f"Comment by {self.author.username} on Post #{self.post_id}"

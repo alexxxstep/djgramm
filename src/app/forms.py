@@ -3,7 +3,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import Post, PostImage, Profile, User
+from .models import Comment, Post, PostImage, Profile, User
 
 
 class RegistrationForm(UserCreationForm):
@@ -66,7 +66,26 @@ PostImageFormSet = forms.inlineformset_factory(
     Post,
     PostImage,
     form=PostImageForm,
-    extra=3,
+    extra=6,  # Extra empty forms for new images
     max_num=10,
     can_delete=True,
+    validate_max=True,
 )
+
+
+class CommentForm(forms.ModelForm):
+    """Comment form."""
+
+    class Meta:
+        model = Comment
+        fields = ["text"]
+        widgets = {
+            "text": forms.Textarea(
+                attrs={
+                    "rows": 2,
+                    "placeholder": "Add a comment...",
+                    "maxlength": 500,
+                    "class": "comment-input",
+                }
+            ),
+        }
