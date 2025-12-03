@@ -10,7 +10,7 @@ skinparam class {
 ' Класи
 class User {
   +Integer id
-  +String email
+  +String email <<unique>>
   +String username
   +String first_name
   +String last_name
@@ -20,68 +20,120 @@ class User {
   +DateTime date_joined
   --
   +get_full_name()
+  +__str__()
 }
 
 note right of User
   AbstractUser
   USERNAME_FIELD = email
+  REQUIRED_FIELDS = ["username"]
   Verification handled in Views
 end note
 
 class Profile {
   +Integer id
-  +Integer user_id
+  +Integer user_id <<FK>>
+  +String full_name
   +Text bio
   +ImageField avatar
-  +DateTime created_at
-  +DateTime updated_at
   --
-  +get_avatar_url()
+  +__str__()
 }
 
 note right of Profile
   One-to-One with User
-  Full name removed (DRY)
+  related_name = "profile"
+  Created via signal
 end note
 
 class Post {
   +Integer id
-  +Integer author_id
+  +Integer author_id <<FK>>
   +Text caption
   +DateTime created_at
   +DateTime updated_at
   --
-  +get_likes_count()
-  +is_liked_by(user)
+  +get_absolute_url()
+  +__str__()
 }
+
+note right of Post
+  related_name = "posts"
+  Many-to-Many with Tag
+  Ordering: -created_at
+end note
 
 class PostImage {
   +Integer id
-  +Integer post_id
+  +Integer post_id <<FK>>
   +ImageField image
   +Integer order
-  +DateTime created_at
 }
+
+note right of PostImage
+  related_name = "images"
+  Ordering: order
+end note
 
 class Tag {
   +Integer id
-  +String name
-  +SlugField slug
+  +String name <<unique>>
+  +SlugField slug <<unique>>
   +DateTime created_at
   --
-  +save()
+  +get_absolute_url()
+  +__str__()
 }
+
+note right of Tag
+  Ordering: name
+end note
 
 class Like {
   +Integer id
-  +Integer user_id
-  +Integer post_id
+  +Integer user_id <<FK>>
+  +Integer post_id <<FK>>
   +DateTime created_at
+  --
+  +__str__()
 }
 
 note right of Like
   unique_together:
   [user, post]
+  related_name = "likes"
+end note
+
+class Comment {
+  +Integer id
+  +Integer author_id <<FK>>
+  +Integer post_id <<FK>>
+  +Text text
+  +DateTime created_at
+  --
+  +__str__()
+}
+
+note right of Comment
+  related_name = "comments"
+  Ordering: created_at
+end note
+
+class Follow {
+  +Integer id
+  +Integer follower_id <<FK>>
+  +Integer following_id <<FK>>
+  +DateTime created_at
+  --
+  +__str__()
+}
+
+note right of Follow
+  unique_together:
+  [follower, following]
+  related_name = "following" (follower)
+  related_name = "followers" (following)
+  Ordering: -created_at
 end note
 
 ' Зв'язки
@@ -91,5 +143,10 @@ Post "1" *-- "*" PostImage : contains
 Post "*" -- "*" Tag : tagged with
 User "*" -- "*" Post : likes >
 (User, Post) .. Like
+User "1" -- "*" Comment : writes >
+Post "1" -- "*" Comment : has >
+User "1" -- "*" Follow : follower >
+User "1" -- "*" Follow : following >
+(User, User) .. Follow
 
 @enduml
