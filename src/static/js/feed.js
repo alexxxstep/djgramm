@@ -24,7 +24,16 @@
                     const likeBtn = document.getElementById(`like-btn-${postId}`);
                     const svg = likeBtn.querySelector('svg');
 
-                    if (likesSpan) likesSpan.textContent = data.likes_count;
+                    if (likesSpan) {
+                        likesSpan.textContent = data.likes_count;
+
+                        // Show/hide based on count
+                        if (data.likes_count > 0) {
+                            likesSpan.classList.remove('hidden');
+                        } else {
+                            likesSpan.classList.add('hidden');
+                        }
+                    }
 
                     if (data.liked) {
                         likeBtn.classList.add('text-red-500');

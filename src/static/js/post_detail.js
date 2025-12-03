@@ -30,7 +30,16 @@
                 const likesSpan = document.getElementById(`likes-count-${postId}`);
                 const svg = likeBtn.querySelector('svg');
 
-                if (likesSpan) likesSpan.textContent = data.likes_count;
+                if (likesSpan) {
+                    likesSpan.textContent = data.likes_count;
+
+                    // Show/hide based on count
+                    if (data.likes_count > 0) {
+                        likesSpan.classList.remove('hidden');
+                    } else {
+                        likesSpan.classList.add('hidden');
+                    }
+                }
 
                 if (data.liked) {
                     likeBtn.classList.add('text-red-500');
@@ -231,7 +240,14 @@
                     `;
                     commentsList.insertAdjacentHTML('beforeend', commentHtml);
 
+                    // Update comments count display
                     commentsCount.textContent = data.comments_count;
+                    if (data.comments_count > 0) {
+                        commentsCount.classList.remove('hidden');
+                    } else {
+                        commentsCount.classList.add('hidden');
+                    }
+
                     commentInput.value = '';
                     commentsSection.scrollTop = commentsSection.scrollHeight;
 
@@ -265,9 +281,13 @@
                 if (data.success) {
                     const commentEl = commentsList.querySelector(`[data-comment-id="${commentId}"]`);
                     if (commentEl) commentEl.remove();
-                    commentsCount.textContent = data.comments_count;
 
-                    if (data.comments_count === 0) {
+                    // Update comments count display
+                    commentsCount.textContent = data.comments_count;
+                    if (data.comments_count > 0) {
+                        commentsCount.classList.remove('hidden');
+                    } else {
+                        commentsCount.classList.add('hidden');
                         commentsList.innerHTML = '<p class="text-gray-400 text-sm text-center py-4" id="no-comments">No comments yet</p>';
                     }
                 }

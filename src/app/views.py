@@ -43,7 +43,7 @@ class FeedView(ListView):
         """Optimize query with related objects."""
         return Post.objects.select_related(
             "author", "author__profile"
-        ).prefetch_related("images", "tags", "likes")
+        ).prefetch_related("images", "tags", "likes", "comments")
 
     def get_context_data(self, **kwargs):
         """Add user's liked posts to context."""
@@ -303,9 +303,7 @@ def add_comment(request, pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -378,9 +376,7 @@ def edit_comment(request, pk, comment_pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -421,9 +417,7 @@ def update_image_order(request, pk):
 
         # Update order for each image
         for index, image_id in enumerate(order_list):
-            PostImage.objects.filter(pk=image_id, post=post).update(
-                order=index
-            )
+            PostImage.objects.filter(pk=image_id, post=post).update(order=index)
 
         return JsonResponse({"success": True})
     except (json.JSONDecodeError, KeyError):
