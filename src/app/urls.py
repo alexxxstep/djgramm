@@ -18,10 +18,14 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     # Profile (edit MUST be before <username> pattern!)
     path(
-        "profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"
+        "profile/edit/",
+        views.ProfileEditView.as_view(),
+        name="profile_edit",
     ),
     path(
-        "profile/<str:username>/", views.ProfileView.as_view(), name="profile"
+        "profile/<str:username>/",
+        views.ProfileView.as_view(),
+        name="profile",
     ),
     # Posts
     path("post/new/", views.PostCreateView.as_view(), name="post_create"),
@@ -37,6 +41,26 @@ urlpatterns = [
         name="post_delete",
     ),
     path("post/<int:pk>/like/", views.toggle_like, name="toggle_like"),
+    path(
+        "post/<int:pk>/comment/",
+        views.add_comment,
+        name="add_comment",
+    ),
+    path(
+        "post/<int:pk>/comment/<int:comment_pk>/delete/",
+        views.delete_comment,
+        name="delete_comment",
+    ),
+    path(
+        "post/<int:pk>/comment/<int:comment_pk>/edit/",
+        views.edit_comment,
+        name="edit_comment",
+    ),
+    path(
+        "post/<int:pk>/reorder-images/",
+        views.update_image_order,
+        name="reorder_images",
+    ),
     # Tags
     path("tag/<slug:slug>/", views.TagPostsView.as_view(), name="tag_posts"),
 ]

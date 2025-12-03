@@ -9,7 +9,7 @@
             {% if is_edit %}Edit Post{% else %}Create New Post{% endif %}
         </h1>
 
-        <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-6" id="post-form">
             {% csrf_token %}
 
             {% if form.errors or image_formset.errors %}
@@ -19,33 +19,79 @@
                         <p>{{ error }}</p>
                     {% endfor %}
                 {% endfor %}
+                {% for img_form in image_formset %}
+                    {% for error in img_form.errors.values %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                {% endfor %}
             </div>
             {% endif %}
 
-            <!-- Images -->
+            <!-- Images Section -->
             <div>
                 <label class="block text-gray-700 font-medium mb-2">Photos</label>
-                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary transition cursor-pointer" id="dropzone">
-                    <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+
+                <!-- Drag & Drop Zone -->
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary transition cursor-pointer relative" id="dropzone">
+                    <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <svg class="w-12 h-12 mx-auto text-gray-400 mb-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
-                    <p class="text-gray-600 mb-2">Drag photos here or click to select</p>
-                    <p class="text-gray-400 text-sm">JPEG, PNG, WebP up to 10MB</p>
+                    <p class="text-gray-600 mb-2 pointer-events-none">Drag photos here or click to select</p>
+                    <p class="text-gray-400 text-sm pointer-events-none">JPEG, PNG, WebP up to 10MB</p>
                 </div>
 
-                <!-- Image inputs -->
-                <div class="mt-4 space-y-3" id="image-inputs">
+                <!-- Existing Images Preview (for edit mode) -->
+                {% if is_edit and object.images.exists %}
+                <div class="mt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-700">Current Photos</h3>
+                        <span class="text-xs text-gray-400">Drag to reorder • First photo is cover</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-3" id="existing-images">
+                        {% for image in object.images.all %}
+                        <div class="relative group cursor-move" data-image-id="{{ image.pk }}" draggable="true">
+                            {% if forloop.first %}
+                            <div class="absolute top-1 left-1 bg-primary text-white text-xs px-2 py-0.5 rounded z-10">Cover</div>
+                            {% endif %}
+                            <img src="{{ image.image.url }}" alt="Photo {{ forloop.counter }}" class="w-full h-24 object-cover rounded-lg border-2 border-gray-200 hover:border-primary transition">
+                            <label class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center cursor-pointer">
+                                <input type="checkbox" name="images-{{ forloop.counter0 }}-DELETE" class="delete-checkbox hidden" data-index="{{ forloop.counter0 }}">
+                                <span class="delete-label text-white text-xs font-medium px-2 py-1 bg-red-500 rounded">Delete</span>
+                            </label>
+                            <div class="absolute top-1 right-1 w-5 h-5 bg-white rounded-full shadow hidden items-center justify-center delete-indicator">
+                                <svg class="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="absolute bottom-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition">
+                                <svg class="w-4 h-4 text-white drop-shadow" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- New Images Preview -->
+                <div class="mt-4 hidden" id="new-images-section">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">New Photos</h3>
+                    <div class="grid grid-cols-4 gap-3" id="new-images-preview"></div>
+                </div>
+
+                <!-- Hidden formset for Django -->
+                <div class="hidden" id="formset-container">
                     {{ image_formset.management_form }}
                     {% for img_form in image_formset %}
-                    <div class="flex items-center space-x-3">
-                        <input type="file" name="{{ img_form.image.html_name }}" accept="image/*"
-                               class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-opacity-90">
+                    <div class="image-form" data-form-index="{{ forloop.counter0 }}">
                         {% if img_form.instance.pk %}
-                        <label class="flex items-center text-red-500 text-sm">
-                            <input type="checkbox" name="{{ img_form.DELETE.html_name }}" class="mr-1">
-                            Delete
-                        </label>
+                        <input type="hidden" name="{{ img_form.id.html_name }}" value="{{ img_form.instance.pk }}">
+                        <input type="hidden" name="{{ img_form.image.html_name }}" value="{{ img_form.instance.image }}">
+                        <input type="checkbox" name="{{ img_form.DELETE.html_name }}" class="existing-delete-cb" data-index="{{ forloop.counter0 }}">
+                        {% else %}
+                        <input type="file" name="{{ img_form.image.html_name }}" class="new-image-input" accept="image/*">
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -55,24 +101,29 @@
             <!-- Caption -->
             <div>
                 <label class="block text-gray-700 font-medium mb-2">Caption</label>
-                <textarea name="caption" rows="4"
-                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                          placeholder="Write a caption..." maxlength="2200">{{ form.caption.value|default:'' }}</textarea>
-                <p class="text-gray-400 text-sm mt-1">{{ form.caption.value|length|default:0 }}/2200</p>
+                <textarea name="caption" rows="4" id="caption-input" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none" placeholder="Write a caption... Use #hashtags to add tags" maxlength="2200">{{ form.caption.value|default:'' }}</textarea>
+                <p class="text-gray-400 text-sm mt-1"><span id="char-count">{{ form.caption.value|length|default:0 }}</span>/2200</p>
             </div>
 
             <!-- Submit -->
             <div class="flex space-x-4">
-                <button type="submit"
-                        class="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">
+                <button type="submit" class="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">
                     {% if is_edit %}Save Changes{% else %}Share{% endif %}
                 </button>
-                <a href="{% if is_edit %}{{ object.get_absolute_url }}{% else %}{% url 'feed' %}{% endif %}"
-                   class="flex-1 text-center border border-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 transition">
+                <a href="{% if is_edit %}{{ object.get_absolute_url }}{% else %}{% url 'feed' %}{% endif %}" class="flex-1 text-center border border-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 transition">
                     Cancel
                 </a>
             </div>
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+<script>
+    // Pass Django template variables to JavaScript
+    window.POST_ID = {% if object %}{{ object.pk }}{% else %}null{% endif %};
+</script>
+<script src="{% static 'js/post_form.js' %}"></script>
 {% endblock %}

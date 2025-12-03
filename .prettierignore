@@ -1,0 +1,10 @@
+# Ignore Django templates - Prettier breaks Django template tags
+*.html
+src/templates/**
+templates/**
+
+# Other ignores
+*.min.js
+*.min.css
+staticfiles/
+
