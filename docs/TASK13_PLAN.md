@@ -135,6 +135,7 @@ class Follow(models.Model):
 - `related_name="followers"` — користувачі, які підписались
 - `unique_together` — запобігає дублюванню підписок
 - Заборона підписки на самого себе (перевірка в view)
+- Використати `select_related` та `prefetch_related` для оптимізації (перевірити через Django Debug Toolbar)
 
 #### Крок 1.2: Додавання helper методів до User
 
@@ -203,6 +204,11 @@ python manage.py migrate
 - `profile/<username>/followers/`
 - `profile/<username>/following/`
 
+**Важливо для оптимізації:**
+
+- Використати `select_related("user", "user__profile")` для завантаження профілів одним запитом
+- Перевірити через Django Debug Toolbar (Фаза 3.5), що немає N+1 проблем
+
 **Результат:** Повна функціональність підписок
 
 ---
@@ -238,6 +244,8 @@ def get_queryset(self):
     )
 ```
 
+**Примітка:** Після реалізації використати Django Debug Toolbar для перевірки кількості SQL-запитів та оптимізації (див. Фаза 3.5).
+
 **Додати в контекст:**
 
 - `following_count` — кількість підписок
@@ -252,6 +260,75 @@ def get_queryset(self):
 - Показ кількості підписок
 
 **Результат:** Новинна стрічка показує тільки пости від підписок
+
+---
+
+### Фаза 3.5: Налаштування Django Debug Toolbar (для оптимізації запитів)
+
+**Невелика таска:** Додати Django Debug Toolbar для аналізу та оптимізації SQL-запитів.
+
+**Мета:** Виявлення N+1 проблем, аналіз продуктивності запитів, оптимізація використання `select_related` та `prefetch_related`.
+
+#### Крок 3.5.1: Встановлення
+
+```bash
+uv add --group dev django-debug-toolbar
+```
+
+#### Крок 3.5.2: Налаштування settings.py
+
+```python
+# Додати до INSTALLED_APPS (тільки для DEBUG)
+if DEBUG:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware"] + MIDDLEWARE
+
+    INTERNAL_IPS = ["127.0.0.1", "localhost"]
+    # Для Docker
+    import socket
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS += [ip[:-1] + "1" for ip in ips]
+
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TEMPLATE_CONTEXT": True,
+        "SHOW_COLLAPSED": True,
+    }
+```
+
+#### Крок 3.5.3: Налаштування URLs
+
+```python
+# src/config/urls.py
+if settings.DEBUG:
+    urlpatterns += [path("__debug__/", include("debug_toolbar.urls"))]
+```
+
+#### Крок 3.5.4: Перевірка та використання
+
+1. Запустити сервер, відкрити будь-яку сторінку
+2. Перевірити наявність панелі Django Debug Toolbar (справа на екрані)
+3. Використовувати панель **SQL** для аналізу кількості запитів та виявлення N+1 проблем
+
+**Важливо:** DjDT працює тільки в DEBUG режимі, не використовувати в production.
+
+**Приклад оптимізації:**
+
+```python
+# Погано - N+1 запитів
+posts = Post.objects.all()
+for post in posts:
+    print(post.author.username)
+
+# Добре - 1 запит з JOIN
+posts = Post.objects.select_related("author").all()
+
+# Для M2M - prefetch_related
+posts = Post.objects.prefetch_related("tags", "likes").all()
+```
+
+**Детальна інструкція:** Див. `.cursor/docs/django-debug-toolbar-setup.md`
+
+**Результат:** DjDT налаштований, можна аналізувати та оптимізувати SQL-запити
 
 ---
 
@@ -839,26 +916,28 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 ## Загальний таймлайн
 
-| Фаза            | Результат                |
-| --------------- | ------------------------ |
-| Модель Follow   | Модель + міграції        |
-| Views підписок  | Підписка/відписка        |
-| Новинна стрічка | Feed з підписок          |
-| Cloudinary      | Зберігання на Cloudinary |
-| UI покращення   | Сучасний дизайн          |
-| Тестування      | Покриття тестами         |
-| Деплой          | Розгорнуто на сервері    |
+| Фаза                 | Результат                    |
+| -------------------- | ---------------------------- |
+| Модель Follow        | Модель + міграції            |
+| Views підписок       | Підписка/відписка            |
+| Новинна стрічка      | Feed з підписок              |
+| Django Debug Toolbar | Налаштування для оптимізації |
+| Cloudinary           | Зберігання на Cloudinary     |
+| UI покращення        | Сучасний дизайн              |
+| Тестування           | Покриття тестами             |
+| Деплой               | Розгорнуто на сервері        |
 
 ---
 
 ## Ключові принципи
 
 1. **Збереження архітектури** — Single App моноліт
-2. **Оптимізація запитів** — `select_related`, `prefetch_related` для Follow
+2. **Оптимізація запитів** — `select_related`, `prefetch_related` для Follow, аналіз через Django Debug Toolbar
 3. **AJAX для інтерактивності** — Follow/Unfollow без перезавантаження
 4. **Cloudinary для production** — локальне зберігання для розробки (опціонально)
 5. **Тести для всіх функцій** — мінімум 80% покриття
 6. **Responsive design** — мобільна версія
+7. **Діагностика продуктивності** — Django Debug Toolbar для виявлення N+1 проблем
 
 ---
 
@@ -867,6 +946,15 @@ CLOUDINARY_API_SECRET=your_api_secret
 - [ ] Модель Follow створена та міграції застосовані
 - [ ] Views для підписок працюють
 - [ ] Новинна стрічка показує тільки пости від підписок
+- [ ] Django Debug Toolbar налаштований для оптимізації запитів (опціонально)
+  - [ ] Встановлено залежність через `uv add --group dev django-debug-toolbar`
+  - [ ] Налаштовано INSTALLED_APPS, MIDDLEWARE, INTERNAL_IPS (тільки для DEBUG)
+  - [ ] Додано URLs в `urls.py` (тільки для DEBUG)
+  - [ ] Перевірено роботу toolbar та аналіз SQL-запитів
+- [ ] SQL-запити оптимізовані (перевірено через DjDT)
+  - [ ] Виявлено та виправлено N+1 проблеми в FeedView
+  - [ ] Виправлено N+1 проблеми в списках підписників/підписок
+  - [ ] Використано `select_related` та `prefetch_related` де потрібно
 - [ ] Cloudinary налаштований та працює
 - [ ] Всі зображення завантажені на Cloudinary
 - [ ] UI покращений з Tailwind
@@ -882,6 +970,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 - [Cloudinary Python SDK](https://cloudinary.com/documentation/django_integration)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [Django Follow System Tutorial](https://www.youtube.com/watch?v=example)
+- [Django Debug Toolbar Documentation](https://django-debug-toolbar.readthedocs.io/en/latest/) — для оптимізації запитів
 
 ---
 
@@ -893,6 +982,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 - Новинну стрічку з постами від підписок
 - Інтеграцію Cloudinary для зберігання зображень
 - Покращений UI з Tailwind CSS
+- Django Debug Toolbar для оптимізації запитів (dev-середовище)
 - Повне тестування нових функцій
 - Production-ready деплой
 
