@@ -22,6 +22,7 @@ services:
     command: uv run python manage.py runserver 0.0.0.0:9000
     volumes:
       - ./src:/app
+      - ./pyproject.toml:/app/pyproject.toml:ro
       - venv_data:/app/.venv
       - static_data:/app/staticfiles
       - media_data:/app/media
