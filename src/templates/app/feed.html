@@ -10,7 +10,7 @@
             {% for post in posts %}
             <article class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <!-- Header -->
-                <div class="flex items-center p-4">
+                <div class="flex items-center justify-between p-4">
                     <a href="{% url 'profile' username=post.author.username %}" class="flex items-center space-x-3">
                         {% if post.author.profile.avatar %}
                         <img src="{{ post.author.profile.avatar.url }}"
@@ -23,6 +23,22 @@
                         {% endif %}
                         <span class="font-semibold text-gray-900">{{ post.author.username }}</span>
                     </a>
+                    <!-- Follow/Unfollow Button -->
+                    {% if user.is_authenticated and user != post.author %}
+                        {% if post.author.id in user_following_ids %}
+                        <button class="follow-btn px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
+                                data-username="{{ post.author.username }}"
+                                data-following="true">
+                            Unfollow
+                        </button>
+                        {% else %}
+                        <button class="follow-btn px-4 py-1.5 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-opacity-90 transition"
+                                data-username="{{ post.author.username }}"
+                                data-following="false">
+                            Follow
+                        </button>
+                        {% endif %}
+                    {% endif %}
                 </div>
 
                 <!-- Image -->
@@ -129,5 +145,6 @@
 {% load static %}
 {% if user.is_authenticated %}
 <script src="{% static 'js/feed.js' %}"></script>
+<script src="{% static 'js/follow.js' %}"></script>
 {% endif %}
 {% endblock %}

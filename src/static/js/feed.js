@@ -1,9 +1,12 @@
 // Feed page functionality - Like buttons
 (function() {
-    function initLikes() {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                         document.querySelector('meta[name=csrf-token]')?.content;
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+               document.querySelector('meta[name=csrf-token]')?.content;
+    }
 
+    function initLikes() {
+        const csrfToken = getCsrfToken();
         if (!csrfToken) return;
 
         document.querySelectorAll('.like-btn').forEach(btn => {
