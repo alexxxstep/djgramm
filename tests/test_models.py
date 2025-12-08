@@ -2,8 +2,9 @@
 
 import pytest
 from django.db import IntegrityError
+from django.utils import timezone
 
-from app.models import Like, Post, PostImage, Profile, Tag, User
+from app.models import Follow, Like, Post, PostImage, Profile, Tag, User
 
 
 class TestUserModel:
@@ -116,8 +117,19 @@ class TestPostModel:
 
     def test_post_ordering(self, user, db):
         """Test that posts are ordered by -created_at."""
-        post1 = Post.objects.create(author=user, caption="First")
-        post2 = Post.objects.create(author=user, caption="Second")
+
+        now = timezone.now()
+        post1 = Post.objects.create(
+            author=user,
+            caption="First",
+            created_at=now,  # fmt: skip
+        )
+        post2 = Post.objects.create(
+            author=user,
+            caption="Second",
+            created_at=now + timezone.timedelta(seconds=1),
+        )
+
         posts = list(Post.objects.all())
         assert posts[0] == post2  # Newer first
         assert posts[1] == post1
@@ -189,3 +201,83 @@ class TestLikeModel:
         Like.objects.create(user=user, post=post2)
 
         assert user.likes.count() == 2
+
+
+class TestFollowModel:
+    """Tests for Follow model."""
+
+    def test_create_follow(self, user, user2, db):
+        """Test creating a follow relationship."""
+        follow = Follow.objects.create(follower=user, following=user2)
+        assert follow.follower == user
+        assert follow.following == user2
+        assert follow.created_at is not None
+
+    def test_follow_str(self, user, user2, db):
+        """Test follow string representation."""
+        follow = Follow.objects.create(follower=user, following=user2)
+        assert str(follow) == f"{user.username} follows {user2.username}"
+
+    def test_follow_unique_together(self, user, user2, db):
+        """Test that user can only follow another user once."""
+        Follow.objects.create(follower=user, following=user2)
+        with pytest.raises(IntegrityError):
+            Follow.objects.create(follower=user, following=user2)
+
+    def test_user_can_follow_multiple_users(self, user, user2, db):
+        """Test that user can follow multiple different users."""
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@example.com",
+            password="testpass123",
+        )
+        Follow.objects.create(follower=user, following=user2)
+        Follow.objects.create(follower=user, following=user3)
+        assert user.following.count() == 2
+
+    def test_follow_ordering(self, user, user2, db):
+        """Test that follows are ordered by -created_at."""
+        follow1 = Follow.objects.create(follower=user, following=user2)
+        follow2 = Follow.objects.create(
+            follower=user2, following=user
+        )  # Reverse follow
+        follows = list(Follow.objects.all())
+        assert follows[0] == follow2  # Newer first
+        assert follows[1] == follow1
+
+
+class TestUserFollowMethods:
+    """Tests for User follow helper methods."""
+
+    def test_get_followers_count(self, user, user2, db):
+        """Test get_followers_count method."""
+        assert user.get_followers_count() == 0
+        Follow.objects.create(follower=user2, following=user)
+        assert user.get_followers_count() == 1
+
+    def test_get_following_count(self, user, user2, db):
+        """Test get_following_count method."""
+        assert user.get_following_count() == 0
+        Follow.objects.create(follower=user, following=user2)
+        assert user.get_following_count() == 1
+
+    def test_is_following_true(self, user, user2, db):
+        """Test is_following returns True when following."""
+        Follow.objects.create(follower=user, following=user2)
+        assert user.is_following(user2) is True
+
+    def test_is_following_false(self, user, user2, db):
+        """Test is_following returns False when not following."""
+        assert user.is_following(user2) is False
+
+    def test_is_following_with_none(self, user):
+        """Test is_following handles None gracefully."""
+        assert user.is_following(None) is False
+
+    def test_related_names_work(self, user, user2, db):
+        """Test that related_name attributes work correctly."""
+        Follow.objects.create(follower=user, following=user2)
+        # user.following = Follow objects where user is follower
+        assert user.following.filter(following=user2).exists()
+        # user2.followers = Follow objects where user2 is being followed
+        assert user2.followers.filter(follower=user).exists()

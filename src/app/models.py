@@ -17,6 +17,20 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
+    def get_followers_count(self):
+        "Return number of followers."
+        return self.followers.count()
+
+    def get_following_count(self):
+        "Return number of users being followed."
+        return self.following.count()
+
+    def is_following(self, user):
+        "Check if current user follows given user."
+        if not user or not isinstance(user, User):
+            return False
+        return self.following.filter(following=user).exists()
+
 
 class Profile(models.Model):
     """User profile with additional information."""
@@ -121,3 +135,22 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.author.username} on Post #{self.post_id}"
+
+
+class Follow(models.Model):
+    """Follow relationship between users."""
+
+    follower = models.ForeignKey(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="following"
+    )
+    following = models.ForeignKey(  # fmt: skip
+        User, on_delete=models.CASCADE, related_name="followers"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["follower", "following"]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.following.username}"
