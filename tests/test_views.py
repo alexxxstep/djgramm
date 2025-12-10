@@ -2,7 +2,7 @@
 
 from django.urls import reverse
 
-from app.models import Like, Post, User
+from app.models import Follow, Like, Post, User
 
 
 class TestFeedView:
@@ -142,6 +142,56 @@ class TestProfileView:
             reverse("profile", kwargs={"username": "nonexistent"})
         )
         assert response.status_code == 404
+
+    # =============================================================================
+    # Followers and Following Counts
+    # =============================================================================
+
+    def test_profile_shows_followers_count(self, client, user, user2, db):
+        """Test profile shows followers count."""
+        Follow.objects.create(follower=user2, following=user)
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
+        assert response.status_code == 200
+        assert response.context["followers_count"] == 1
+
+    def test_profile_shows_following_count(self, client, user, user2, db):
+        """Test profile shows following count."""
+        Follow.objects.create(follower=user, following=user2)
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
+        assert response.status_code == 200
+        assert response.context["following_count"] == 1
+
+    def test_profile_shows_is_following_for_authenticated(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test profile shows is_following status for authenticated user."""
+        # Initially not following
+        response = authenticated_client.get(
+            reverse("profile", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 200
+        assert response.context["is_following"] is False
+
+        # Follow
+        Follow.objects.create(follower=user, following=user2)
+
+        # Check that now following
+        response = authenticated_client.get(
+            reverse("profile", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 200
+        assert response.context["is_following"] is True
+
+    def test_profile_is_following_false_for_anonymous(self, client, user):
+        """Test profile shows is_following=False for anonymous users."""
+        response = client.get(reverse("profile",
+         kwargs={"username": user.username}))  # fmt: skip
+        assert response.status_code == 200
+        assert response.context["is_following"] is False
 
 
 class TestProfileEditView:
@@ -327,5 +377,68 @@ class TestTagPostsView:
         """Test 404 for non-existent tag."""
         response = client.get(
             reverse("tag_posts", kwargs={"slug": "nonexistent"})
+        )
+        assert response.status_code == 404
+
+
+class TestToggleFollowView:
+    """Tests for toggle_follow view."""
+
+    def test_follow_requires_login(self, client, user2):
+        """Test that following requires login."""
+        response = client.post(
+            reverse("toggle_follow", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 302  # Redirect to login
+
+    def test_follow_requires_post_method(self, authenticated_client, user2):
+        """Test that only POST method is allowed."""
+        response = authenticated_client.get(
+            reverse("toggle_follow", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 405  # Method not allowed
+
+    def test_follow_user(self, authenticated_client, user, user2):
+        """Test following a user."""
+        response = authenticated_client.post(
+            reverse("toggle_follow", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_following"] is True
+        assert data["followers_count"] == 1
+        assert Follow.objects.filter(follower=user, following=user2).exists()
+
+    def test_unfollow_user(self, authenticated_client, user, user2, db):
+        """Test unfollowing a user."""
+        # First follow
+        Follow.objects.create(follower=user, following=user2)
+
+        # Then unfollow
+        response = authenticated_client.post(
+            reverse("toggle_follow", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_following"] is False
+        assert data["followers_count"] == 0
+        assert not Follow.objects.filter(
+            follower=user, following=user2
+        ).exists()
+
+    def test_cannot_follow_self(self, authenticated_client, user):
+        """Test that user cannot follow themselves."""
+        response = authenticated_client.post(
+            reverse("toggle_follow", kwargs={"username": user.username})
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert "error" in data
+        assert "yourself" in data["error"].lower()
+
+    def test_follow_nonexistent_user(self, authenticated_client):
+        """Test following non-existent user returns 404."""
+        response = authenticated_client.post(
+            reverse("toggle_follow", kwargs={"username": "nonexistent"})
         )
         assert response.status_code == 404

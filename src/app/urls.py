@@ -27,6 +27,21 @@ urlpatterns = [
         views.ProfileView.as_view(),
         name="profile",
     ),
+    path(
+        "profile/<str:username>/follow/",
+        views.toggle_follow,
+        name="toggle_follow",
+    ),
+    path(
+        "profile/<str:username>/followers/",
+        views.FollowersListView.as_view(),
+        name="followers_list",
+    ),
+    path(
+        "profile/<str:username>/following/",
+        views.FollowingListView.as_view(),
+        name="following_list",
+    ),
     # Posts
     path("post/new/", views.PostCreateView.as_view(), name="post_create"),
     path("post/<int:pk>/", views.PostDetailView.as_view(), name="post_detail"),
