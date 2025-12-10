@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load app_tags %}
 
-{% block title %}Feed | DJGramm{% endblock %}
+{% block title %}{% if is_news_feed %}News Feed{% else %}Feed{% endif %} | DJGramm{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
@@ -121,20 +121,39 @@
         {% include "app/_pagination.html" %}
     {% else %}
         <div class="text-center py-16">
-            <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-            <h2 class="text-xl font-semibold text-gray-700 mb-2">No posts yet</h2>
-            <p class="text-gray-500 mb-6">Be the first to share something!</p>
-            {% if user.is_authenticated %}
-            <a href="{% url 'post_create' %}" class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
-                Create Post
-            </a>
+            {% if is_news_feed and following_count == 0 and user.is_authenticated %}
+                <!-- Empty news feed message -->
+                <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                    No posts in your news feed
+                </h2>
+                <p class="text-gray-500 mb-6">
+                    Follow users to see their posts here
+                </p>
+                <a href="{% url 'feed' %}"
+                   class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
+                    Discover Users
+                </a>
             {% else %}
-            <a href="{% url 'register' %}" class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
-                Sign Up
-            </a>
+                <!-- Regular empty feed message -->
+                <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">No posts yet</h2>
+                <p class="text-gray-500 mb-6">Be the first to share something!</p>
+                {% if user.is_authenticated %}
+                <a href="{% url 'post_create' %}" class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
+                    Create Post
+                </a>
+                {% else %}
+                <a href="{% url 'register' %}" class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
+                    Sign Up
+                </a>
+                {% endif %}
             {% endif %}
         </div>
     {% endif %}

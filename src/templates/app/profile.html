@@ -53,7 +53,7 @@
                 </div>
                 <div>
                     <a href="{% url 'followers_list' username=profile_user.username %}" class="hover:underline">
-                        <span class="font-semibold">{{ followers_count }}</span>
+                        <span class="font-semibold" id="followers-count">{{ followers_count }}</span>
                         <span class="text-gray-500">followers</span>
                     </a>
                 </div>
