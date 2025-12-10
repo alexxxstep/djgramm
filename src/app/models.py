@@ -11,6 +11,14 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     is_email_verified = models.BooleanField(default=False)
 
+    # ManyToMany relationship through Follow model
+    following = models.ManyToManyField(
+        "self",
+        through="Follow",
+        symmetrical=False,
+        related_name="followers",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
 
@@ -18,18 +26,34 @@ class User(AbstractUser):
         return self.email
 
     def get_followers_count(self):
-        "Return number of followers."
+        """Return number of followers."""
         return self.followers.count()
 
     def get_following_count(self):
-        "Return number of users being followed."
+        """Return number of users being followed."""
         return self.following.count()
 
     def is_following(self, user):
-        "Check if current user follows given user."
+        """Check if current user follows given user."""
         if not user or not isinstance(user, User):
             return False
-        return self.following.filter(following=user).exists()
+        return self.following.contains(user)
+
+    def follow(self, user):
+        """Follow a user. Returns (Follow instance, created)."""
+        if not user or not isinstance(user, User) or user == self:
+            return None, False
+        return Follow.objects.get_or_create(follower=self, following=user)
+
+    def unfollow(self, user):
+        """Unfollow a user. Returns True if unfollowed, False otherwise."""
+        if not user or not isinstance(user, User):
+            return False
+        deleted, _ = Follow.objects.filter(
+            follower=self,
+            following=user,  # fmt: skip
+        ).delete()
+        return deleted > 0
 
 
 class Profile(models.Model):
@@ -138,18 +162,18 @@ class Comment(models.Model):
 
 
 class Follow(models.Model):
-    """Follow relationship between users."""
+    """Intermediate model for User following relationship."""
 
     follower = models.ForeignKey(  # fmt: skip
-        User, on_delete=models.CASCADE, related_name="following"
+        User, on_delete=models.CASCADE, related_name="following_set"
     )
     following = models.ForeignKey(  # fmt: skip
-        User, on_delete=models.CASCADE, related_name="followers"
+        User, on_delete=models.CASCADE, related_name="followers_set"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["follower", "following"]
+        unique_together = [["follower", "following"]]
         ordering = ["-created_at"]
 
     def __str__(self):

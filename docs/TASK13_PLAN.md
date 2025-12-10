@@ -47,14 +47,23 @@
 
 ## Нові вимоги
 
-### 1. Модель Follow (Following/Followers)
+### 1. Модель Follow (Following/Followers) - ManyToManyField підхід
 
 **Структура:**
 
-- `follower` — ForeignKey до User (хто підписується)
-- `following` — ForeignKey до User (на кого підписуються)
-- `created_at` — дата підписки
+- `User.following` — ManyToManyField('self', through='Follow', symmetrical=False)
+- `Follow` — проміжна модель (through) з додатковими полями:
+  - `follower` — ForeignKey до User (хто підписується)
+  - `following` — ForeignKey до User (на кого підписуються)
+  - `created_at` — дата підписки
 - `unique_together` — один користувач не може підписатися двічі на одного
+
+**Переваги ManyToManyField:**
+
+- Простіші запити: `user.following.all()` повертає QuerySet User об'єктів (не Follow)
+- Простіше додавання: `user1.following.add(user2)` замість `Follow.objects.create()`
+- Простіша перевірка: `user.following.filter(id=target_user.id).exists()`
+- Краща інтеграція з Django ORM
 
 **Методи:**
 
@@ -99,30 +108,60 @@
 
 ## Фази реалізації
 
-### Фаза 1: Модель Follow та міграції
+### Фаза 1: Модель Follow з ManyToManyField та міграції
 
-#### Крок 1.1: Створення моделі Follow
+#### Крок 1.1: Додавання ManyToManyField до User
+
+**Файл:** `src/app/models.py` (клас User)
+
+```python
+class User(AbstractUser):
+    """Custom user model with email authentication."""
+
+    email = models.EmailField(unique=True)
+    is_email_verified = models.BooleanField(default=False)
+
+    # ManyToMany relationship через проміжну модель Follow
+    following = models.ManyToManyField(
+        'self',
+        through='Follow',
+        symmetrical=False,
+        related_name='followers'
+    )
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username"]
+```
+
+**Важливо:**
+
+- `'self'` — відношення User до самого себе
+- `through='Follow'` — використовує проміжну модель Follow
+- `symmetrical=False` — асиметричне відношення (A підписаний на B ≠ B підписаний на A)
+- `related_name='followers'` — зворотний доступ: `user.followers.all()`
+
+#### Крок 1.2: Оновлення моделі Follow (проміжна модель)
 
 **Файл:** `src/app/models.py`
 
 ```python
 class Follow(models.Model):
-    """Follow relationship between users."""
+    """Intermediate model for User following relationship."""
 
-    follower = models.ForeignKey(
+    follower = models.ForeignKey(  # fmt: skip
         User,
         on_delete=models.CASCADE,
-        related_name="following"
+        related_name="following_set"  # Змінено для уникнення конфлікту
     )
-    following = models.ForeignKey(
+    following = models.ForeignKey(  # fmt: skip
         User,
         on_delete=models.CASCADE,
-        related_name="followers"
+        related_name="followers_set"  # Змінено для уникнення конфлікту
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["follower", "following"]
+        unique_together = [["follower", "following"]]
         ordering = ["-created_at"]
 
     def __str__(self):
@@ -131,13 +170,12 @@ class Follow(models.Model):
 
 **Важливо:**
 
-- `related_name="following"` — користувачі, на яких підписано
-- `related_name="followers"` — користувачі, які підписались
+- `related_name="following_set"` та `"followers_set"` — для прямого доступу до Follow об'єктів
+- `user.following.all()` — повертає QuerySet User об'єктів (через ManyToManyField)
+- `user.following_set.all()` — повертає QuerySet Follow об'єктів (прямий доступ)
 - `unique_together` — запобігає дублюванню підписок
-- Заборона підписки на самого себе (перевірка в view)
-- Використати `select_related` та `prefetch_related` для оптимізації (перевірити через Django Debug Toolbar)
 
-#### Крок 1.2: Додавання helper методів до User
+#### Крок 1.3: Оновлення helper методів до User
 
 **Файл:** `src/app/models.py` (клас User)
 
@@ -152,7 +190,9 @@ def get_following_count(self):
 
 def is_following(self, user):
     """Check if current user follows given user."""
-    return self.following.filter(following=user).exists()
+    if not user or not isinstance(user, User):
+        return False
+    return self.following.filter(id=user.id).exists()  # Спрощено!
 ```
 
 #### Крок 1.3: Створення міграції
@@ -168,7 +208,7 @@ python manage.py migrate
 
 ### Фаза 2: Views для підписок
 
-#### Крок 2.1: View для підписки/відписки
+#### Крок 2.1: View для підписки/відписки (оновлено для ManyToManyField)
 
 **Файл:** `src/app/views.py`
 
@@ -178,8 +218,38 @@ python manage.py migrate
 
 1. Отримати користувача за username
 2. Перевірити, що не підписується на себе
-3. Створити або видалити Follow запис
+3. Використати `user.following.add()` або `user.following.remove()` (ManyToManyField)
 4. Повернути JSON зі статусом та кількістю підписників
+
+**Приклад коду:**
+
+```python
+@login_required
+def toggle_follow(request, username):
+    """Toggle follow/unfollow a user (AJAX endpoint)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST method required"}, status=405)
+
+    target_user = get_object_or_404(User, username=username)
+
+    if request.user == target_user:
+        return JsonResponse({"error": "Cannot follow yourself"}, status=400)
+
+    # ManyToManyField підхід - простіше!
+    if request.user.following.filter(id=target_user.id).exists():
+        request.user.following.remove(target_user)
+        is_following = False
+    else:
+        request.user.following.add(target_user)
+        is_following = True
+
+    return JsonResponse(
+        {
+            "is_following": is_following,
+            "followers_count": target_user.get_followers_count(),
+        }
+    )
+```
 
 **URL:** `path("profile/<str:username>/follow/", views.toggle_follow, name="toggle_follow")`
 
@@ -192,7 +262,7 @@ python manage.py migrate
 - `following_count` — кількість підписок
 - `posts_count` — вже є
 
-#### Крок 2.3: Список підписників/підписок
+#### Крок 2.3: Список підписників/підписок (оновлено для ManyToManyField)
 
 **Views:**
 
@@ -206,8 +276,19 @@ python manage.py migrate
 
 **Важливо для оптимізації:**
 
-- Використати `select_related("user", "user__profile")` для завантаження профілів одним запитом
+- З ManyToManyField: `user.followers.all()` вже повертає QuerySet User об'єктів
+- Використати `prefetch_related("profile")` для завантаження профілів одним запитом
 - Перевірити через Django Debug Toolbar (Фаза 3.5), що немає N+1 проблем
+
+**Приклад коду:**
+
+```python
+class FollowersListView(ListView):
+    def get_queryset(self):
+        self.target_user = get_object_or_404(User, username=self.kwargs["username"])
+        # ManyToManyField - простіше!
+        return self.target_user.followers.prefetch_related("profile").all()
+```
 
 **Результат:** Повна функціональність підписок
 
@@ -219,7 +300,7 @@ python manage.py migrate
 
 **Файл:** `src/app/views.py`
 
-**Зміни в `get_queryset()`:**
+**Зміни в `get_queryset()` (оновлено для ManyToManyField):**
 
 ```python
 def get_queryset(self):
@@ -227,13 +308,12 @@ def get_queryset(self):
     if not self.request.user.is_authenticated:
         return Post.objects.none()
 
-    # Get IDs of users being followed
-    following_ids = self.request.user.following.values_list(
-        'following_id', flat=True
-    )
+    # ManyToManyField - простіше отримати користувачів!
+    following_users = self.request.user.following.all()
 
     # Include own posts
-    following_ids = list(following_ids) + [self.request.user.id]
+    following_ids = list(following_users.values_list('id', flat=True))
+    following_ids.append(self.request.user.id)
 
     return Post.objects.filter(
         author_id__in=following_ids
@@ -596,12 +676,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 **Файл:** `tests/test_models.py`
 
-**Тести:**
+**Тести (оновлено для ManyToManyField):**
 
-- Створення підписки
-- Заборона дублювання підписки
-- Заборона підписки на себе
+- Створення підписки через `user1.following.add(user2)`
+- Заборона дублювання підписки (через `unique_together`)
+- Заборона підписки на себе (перевірка в view)
 - Методи `get_followers_count()`, `get_following_count()`, `is_following()`
+- Перевірка, що `user.following.all()` повертає QuerySet User об'єктів
 
 #### Крок 6.2: Тести views
 
@@ -629,16 +710,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
 **Файл:** `tests/factories.py`
 
-**Додати:**
+**Додати (оновлено для ManyToManyField):**
 
 ```python
 class FollowFactory(factory.django.DjangoModelFactory):
+    """Factory for Follow model (intermediate model for ManyToManyField)."""
     class Meta:
         model = Follow
 
     follower = factory.SubFactory(UserFactory)
     following = factory.SubFactory(UserFactory)
 ```
+
+**Примітка:** Для створення підписок в тестах можна використовувати:
+
+- `user1.following.add(user2)` - через ManyToManyField
+- `FollowFactory(follower=user1, following=user2)` - через проміжну модель
 
 **Ціль:** 80%+ покриття нових функцій
 
