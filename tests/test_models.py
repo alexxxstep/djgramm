@@ -277,7 +277,63 @@ class TestUserFollowMethods:
     def test_related_names_work(self, user, user2, db):
         """Test that related_name attributes work correctly."""
         Follow.objects.create(follower=user, following=user2)
-        # user.following = Follow objects where user is follower
-        assert user.following.filter(following=user2).exists()
-        # user2.followers = Follow objects where user2 is being followed
-        assert user2.followers.filter(follower=user).exists()
+        # user.following = User objects (ManyToManyField)
+        assert user.following.contains(user2)
+        # user.following_set = Follow objects where user is follower
+        assert user.following_set.filter(following=user2).exists()
+        # user2.followers = User objects (ManyToManyField reverse)
+        assert user2.followers.contains(user)
+        # user2.followers_set = Follow objects where user2 is being followed
+        assert user2.followers_set.filter(follower=user).exists()
+
+    def test_follow_method(self, user, user2, db):
+        """Test follow method creates Follow relationship."""
+        follow, created = user.follow(user2)
+        assert created is True
+        assert isinstance(follow, Follow)
+        assert follow.follower == user
+        assert follow.following == user2
+        assert user.is_following(user2) is True
+
+    def test_follow_method_idempotent(self, user, user2, db):
+        """Test that follow method is idempotent (no duplicates)."""
+        follow1, created1 = user.follow(user2)
+        assert created1 is True
+        follow2, created2 = user.follow(user2)
+        assert created2 is False
+        assert follow1 == follow2
+        assert user.following.count() == 1
+
+    def test_follow_method_prevents_self_follow(self, user, db):
+        """Test that user cannot follow themselves."""
+        follow, created = user.follow(user)
+        assert created is False
+        assert follow is None
+        assert user.following.count() == 0
+
+    def test_follow_method_with_invalid_user(self, user, db):
+        """Test follow method handles invalid user gracefully."""
+        follow, created = user.follow(None)
+        assert created is False
+        assert follow is None
+
+    def test_unfollow_method(self, user, user2, db):
+        """Test unfollow method removes Follow relationship."""
+        Follow.objects.create(follower=user, following=user2)
+        assert user.is_following(user2) is True
+
+        result = user.unfollow(user2)
+        assert result is True
+        assert user.is_following(user2) is False
+        assert user.following.count() == 0
+
+    def test_unfollow_method_when_not_following(self, user, user2, db):
+        """Test unfollow method when not following returns False."""
+        assert user.is_following(user2) is False
+        result = user.unfollow(user2)
+        assert result is False
+
+    def test_unfollow_method_with_invalid_user(self, user, db):
+        """Test unfollow method handles invalid user gracefully."""
+        result = user.unfollow(None)
+        assert result is False
