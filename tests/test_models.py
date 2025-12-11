@@ -337,3 +337,89 @@ class TestUserFollowMethods:
         """Test unfollow method handles invalid user gracefully."""
         result = user.unfollow(None)
         assert result is False
+
+
+class TestUserUnreadNewsCount:
+    """Tests for get_unread_news_count method."""
+
+    def test_unread_count_when_never_visited(self, user, user2, db):
+        """Test unread count when never visited news feed."""
+        # user follows user2
+        user.following.add(user2)
+        # user2 creates a post
+        Post.objects.create(author=user2, caption="New post")
+        # Should count all posts from followed users
+        assert user.get_unread_news_count() == 1
+
+    def test_unread_count_excludes_own_posts(self, user, user2, db):
+        """Test that own posts are not counted."""
+        user.following.add(user2)
+        # user creates own post
+        Post.objects.create(author=user, caption="My post")
+        # user2 creates a post
+        Post.objects.create(author=user2, caption="Followed post")
+        # Should only count user2's post (not own)
+        assert user.get_unread_news_count() == 1
+
+    def test_unread_count_after_visit(self, user, user2, db):
+        """Test unread count after visiting news feed."""
+        from datetime import timedelta
+
+        user.following.add(user2)
+        # Use fixed time points to avoid timing issues
+        now = timezone.now()
+        visit_time = now - timedelta(days=1)
+        old_post_time = now - timedelta(days=2)
+
+        # Create post before visit
+        # Note: auto_now_add=True ignores created_at in create(),
+        # so we use update() after creation
+        old_post = Post.objects.create(author=user2, caption="Old post")
+        Post.objects.filter(pk=old_post.pk).update(created_at=old_post_time)
+
+        # Set last visit
+        user.profile.last_news_feed_visit = visit_time
+        user.profile.save()
+
+        # Create post after visit
+        new_post = Post.objects.create(author=user2, caption="New post")
+        Post.objects.filter(pk=new_post.pk).update(created_at=now)
+
+        # Refresh from DB to get updated created_at
+        old_post.refresh_from_db()
+        new_post.refresh_from_db()
+
+        # Refresh user profile to ensure last_news_feed_visit is loaded
+        user.profile.refresh_from_db()
+
+        # Verify timestamps are correct
+        assert old_post.created_at < user.profile.last_news_feed_visit
+        assert new_post.created_at > user.profile.last_news_feed_visit
+
+        # Should only count new post
+        count = user.get_unread_news_count()
+        error_msg = (
+            f"Expected 1, got {count}. "
+            f"Old post: {old_post.created_at}, "
+            f"New post: {new_post.created_at}, "
+            f"Visit: {user.profile.last_news_feed_visit}"
+        )
+        assert count == 1, error_msg
+
+    def test_unread_count_zero_when_no_following(self, user, db):
+        """Test unread count is 0 when not following anyone."""
+        assert user.get_unread_news_count() == 0
+
+    def test_unread_count_multiple_followed_users(self, user, user2, db):
+        """Test unread count with multiple followed users."""
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@example.com",
+            password="testpass123",
+        )
+        user.following.add(user2, user3)
+        # Create posts from both followed users
+        Post.objects.create(author=user2, caption="Post from user2")
+        Post.objects.create(author=user3, caption="Post from user3")
+        # Should count both
+        assert user.get_unread_news_count() == 2

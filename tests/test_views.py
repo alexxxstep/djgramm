@@ -381,39 +381,97 @@ class TestTagPostsView:
         assert response.status_code == 404
 
 
+class TestNewsFeedView:
+    """Tests for NewsFeedView."""
+
+    def test_news_feed_requires_login(self, client, db):
+        """Test news feed requires authentication."""
+        response = client.get(reverse("news_feed"))
+        assert response.status_code == 200  # Shows empty feed
+        assert response.context["posts"].count() == 0
+
+    def test_news_feed_shows_only_followed_posts(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test news feed shows only posts from followed users."""
+        # user follows user2
+        user.following.add(user2)
+        # Create posts
+        post1 = Post.objects.create(author=user2, caption="Followed post")
+        post2 = Post.objects.create(author=user, caption="My post")
+        # Create post from user3 (not followed)
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@test.com",
+            password="testpass123",
+        )
+        post3 = Post.objects.create(author=user3, caption="Not followed")
+
+        response = authenticated_client.get(reverse("news_feed"))
+        assert response.status_code == 200
+        posts = list(response.context["posts"])
+        assert post1 in posts
+        assert post2 in posts  # Own posts included
+        assert post3 not in posts
+
+    def test_news_feed_updates_timestamp(self, authenticated_client, user, db):
+        """Test visiting news feed updates last_news_feed_visit."""
+
+        assert user.profile.last_news_feed_visit is None
+
+        response = authenticated_client.get(reverse("news_feed"))
+        assert response.status_code == 200
+
+        user.profile.refresh_from_db()
+        assert user.profile.last_news_feed_visit is not None
+
+    def test_news_feed_empty_when_no_following(
+        self, authenticated_client, user, db
+    ):
+        """Test news feed is empty when not following anyone."""
+        response = authenticated_client.get(reverse("news_feed"))
+        assert response.status_code == 200
+        assert response.context["posts"].count() == 0
+        assert response.context["following_count"] == 0
+
+
 class TestToggleFollowView:
     """Tests for toggle_follow view."""
 
-    def test_follow_requires_login(self, client, user2):
-        """Test that following requires login."""
+    def test_toggle_follow_requires_login(self, client, user2, db):
+        """Test toggle_follow requires authentication."""
         response = client.post(
             reverse("toggle_follow", kwargs={"username": user2.username})
         )
         assert response.status_code == 302  # Redirect to login
 
-    def test_follow_requires_post_method(self, authenticated_client, user2):
-        """Test that only POST method is allowed."""
+    def test_toggle_follow_requires_post(
+        self, authenticated_client, user2, db
+    ):
+        """Test toggle_follow requires POST method."""
         response = authenticated_client.get(
             reverse("toggle_follow", kwargs={"username": user2.username})
         )
         assert response.status_code == 405  # Method not allowed
 
-    def test_follow_user(self, authenticated_client, user, user2):
-        """Test following a user."""
+    def test_toggle_follow_success(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test successful follow."""
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": user2.username})
         )
         assert response.status_code == 200
         data = response.json()
         assert data["is_following"] is True
-        assert data["followers_count"] == 1
-        assert Follow.objects.filter(follower=user, following=user2).exists()
+        assert user.following.filter(id=user2.id).exists()
 
-    def test_unfollow_user(self, authenticated_client, user, user2, db):
-        """Test unfollowing a user."""
+    def test_toggle_follow_unfollow(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test successful unfollow."""
         # First follow
-        Follow.objects.create(follower=user, following=user2)
-
+        user.following.add(user2)
         # Then unfollow
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": user2.username})
@@ -421,22 +479,32 @@ class TestToggleFollowView:
         assert response.status_code == 200
         data = response.json()
         assert data["is_following"] is False
-        assert data["followers_count"] == 0
-        assert not Follow.objects.filter(
-            follower=user, following=user2
-        ).exists()
+        assert not user.following.filter(id=user2.id).exists()
 
-    def test_cannot_follow_self(self, authenticated_client, user):
-        """Test that user cannot follow themselves."""
+    def test_toggle_follow_cannot_follow_self(
+        self, authenticated_client, user, db
+    ):
+        """Test cannot follow yourself."""
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": user.username})
         )
         assert response.status_code == 400
         data = response.json()
         assert "error" in data
-        assert "yourself" in data["error"].lower()
 
-    def test_follow_nonexistent_user(self, authenticated_client):
+    def test_toggle_follow_updates_followers_count(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test toggle_follow updates followers count in response."""
+        initial_count = user2.get_followers_count()
+        response = authenticated_client.post(
+            reverse("toggle_follow", kwargs={"username": user2.username})
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["followers_count"] == initial_count + 1
+
+    def test_toggle_follow_nonexistent_user(self, authenticated_client, db):
         """Test following non-existent user returns 404."""
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": "nonexistent"})

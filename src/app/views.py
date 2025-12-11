@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -40,7 +41,7 @@ class FeedView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        """Optimize query with related objects."""
+        """Show all posts with optimized queries."""
         return Post.objects.select_related(
             "author", "author__profile"
         ).prefetch_related("images", "tags", "likes", "comments")
@@ -55,15 +56,80 @@ class FeedView(ListView):
                     "post_id", flat=True
                 )
             )
-            # Get IDs of users that current user follows (for Follow/Unfollow buttons)
+            # Get IDs of users that current user follows
+            # (for Follow/Unfollow buttons)
             context["user_following_ids"] = set(
-                self.request.user.following.values_list(
-                    "following_id", flat=True
-                )
+                self.request.user.following.values_list("id", flat=True)
+            )
+            # Get following count for empty feed message
+            context["following_count"] = (
+                self.request.user.get_following_count()
             )
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
+            context["following_count"] = 0
+        return context
+
+
+class NewsFeedView(ListView):
+    """Display news feed - posts only from followed users."""
+
+    model = Post
+    template_name = "app/feed.html"
+    context_object_name = "posts"
+    paginate_by = 12
+
+    def dispatch(self, request, *args, **kwargs):
+        """Update last_news_feed_visit timestamp on visit."""
+        response = super().dispatch(request, *args, **kwargs)
+        if request.user.is_authenticated and hasattr(request.user, "profile"):
+            request.user.profile.last_news_feed_visit = timezone.now()
+            request.user.profile.save(update_fields=["last_news_feed_visit"])
+        return response
+
+    def get_queryset(self):
+        """Show posts only from users being followed."""
+        if not self.request.user.is_authenticated:
+            return Post.objects.none()
+
+        # Get users that current user follows (ManyToManyField)
+        following_users = self.request.user.following.all()
+
+        # Include own posts
+        following_ids = list(following_users.values_list("id", flat=True))
+        following_ids.append(self.request.user.id)
+
+        return (
+            Post.objects.filter(author_id__in=following_ids)
+            .select_related("author", "author__profile")
+            .prefetch_related("images", "tags", "likes", "comments")
+        )
+
+    def get_context_data(self, **kwargs):
+        """Add context for news feed."""
+        context = super().get_context_data(**kwargs)
+        context["is_news_feed"] = True
+
+        if self.request.user.is_authenticated:
+            # Get IDs of posts liked by current user
+            context["user_liked_posts"] = set(
+                Like.objects.filter(user=self.request.user).values_list(
+                    "post_id", flat=True
+                )
+            )
+            # Get IDs of users that current user follows
+            context["user_following_ids"] = set(
+                self.request.user.following.values_list("id", flat=True)
+            )
+            # Get following count for empty feed message
+            context["following_count"] = (
+                self.request.user.get_following_count()
+            )
+        else:
+            context["user_liked_posts"] = set()
+            context["user_following_ids"] = set()
+            context["following_count"] = 0
         return context
 
 
@@ -160,13 +226,11 @@ class FollowersListView(ListView):
         context = super().get_context_data(**kwargs)
         context["target_user"] = self.target_user
 
-        # Get IDs of users that current
-        #  user follows (for Follow/Unfollow buttons)
+        # Get IDs of users that current user follows
+        # (for Follow/Unfollow buttons)
         if self.request.user.is_authenticated:
             context["user_following_ids"] = set(
-                self.request.user.following.values_list(
-                    "following_id", flat=True
-                )  # fmt: skip
+                self.request.user.following.values_list("id", flat=True)
             )
         else:
             context["user_following_ids"] = set()
@@ -212,12 +276,10 @@ class FollowingListView(ListView):
         # (for Follow/Unfollow buttons)
         if self.request.user.is_authenticated:
             context["user_following_ids"] = set(
-                self.request.user.following.values_list(
-                    "following_id", flat=True
-                )
+                self.request.user.following.values_list("id", flat=True)
             )
         else:
-            context["user_following_ids"] = set()  # fmt: skip
+            context["user_following_ids"] = set()
 
         return context
 
@@ -414,14 +476,12 @@ def toggle_follow(request, username):
             {"error": "You cannot follow yourself"}, status=400
         )
 
-    follow, created = Follow.objects.get_or_create(
-        follower=request.user, following=target_user
-    )
-
-    if not created:
-        follow.delete()
+    # ManyToManyField approach - simpler and more efficient
+    if request.user.following.filter(id=target_user.id).exists():
+        request.user.following.remove(target_user)
         is_following = False
     else:
+        request.user.following.add(target_user)
         is_following = True
 
     return JsonResponse(

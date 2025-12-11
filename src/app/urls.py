@@ -8,6 +8,7 @@ from . import views
 urlpatterns = [
     # Feed
     path("", views.FeedView.as_view(), name="feed"),
+    path("news/", views.NewsFeedView.as_view(), name="news_feed"),
     # Authentication
     path("register/", views.RegisterView.as_view(), name="register"),
     path(

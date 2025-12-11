@@ -55,6 +55,32 @@ class User(AbstractUser):
         ).delete()
         return deleted > 0
 
+    def get_unread_news_count(self):
+        """Return count of unread posts from followed users."""
+        from django.apps import apps
+
+        Post = apps.get_model("app", "Post")
+
+        if (
+            not hasattr(self, "profile")
+            or not self.profile.last_news_feed_visit
+        ):
+            # If never visited news feed, count all posts from followed users
+            # (excluding own posts)
+            following_ids = list(self.following.values_list("id", flat=True))
+            if not following_ids:
+                return 0
+            return Post.objects.filter(author_id__in=following_ids).count()
+
+        # Count posts created after last visit (excluding own posts)
+        following_ids = list(self.following.values_list("id", flat=True))
+        if not following_ids:
+            return 0
+        return Post.objects.filter(
+            author_id__in=following_ids,
+            created_at__gt=self.profile.last_news_feed_visit,
+        ).count()
+
 
 class Profile(models.Model):
     """User profile with additional information."""
@@ -65,6 +91,7 @@ class Profile(models.Model):
     full_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(max_length=500, blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
+    last_news_feed_visit = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Profile of {self.user.username}"
