@@ -15,7 +15,7 @@
         {% if follows %}
         <div class="space-y-4">
             {% for follow in follows %}
-            <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+            <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-200 rounded-lg px-2">
                 <div class="flex items-center space-x-4 flex-1">
                     <!-- Avatar -->
                     <a href="{% url 'profile' username=follow.following.username %}">
@@ -44,13 +44,15 @@
                 <!-- Follow/Unfollow Button -->
                 {% if user.is_authenticated and user != follow.following %}
                     {% if follow.following.id in user_following_ids %}
-                    <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
-                            onclick="toggleFollow('{{ follow.following.username }}', this)">
+                    <button class="follow-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
+                            data-username="{{ follow.following.username }}"
+                            data-following="true">
                         Unfollow
                     </button>
                     {% else %}
-                    <button class="px-4 py-2 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-opacity-90 transition"
-                            onclick="toggleFollow('{{ follow.following.username }}', this)">
+                    <button class="follow-btn px-4 py-2 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-opacity-90 transition"
+                            data-username="{{ follow.following.username }}"
+                            data-following="false">
                         Follow
                     </button>
                     {% endif %}
@@ -66,29 +68,11 @@
     </div>
 </div>
 
+{% block extra_js %}
+{% load static %}
 {% if user.is_authenticated %}
-<script>
-function toggleFollow(username, button) {
-    fetch(`/profile/${username}/follow/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrf-token]').content,
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert(data.error);
-            return;
-        }
-        button.textContent = data.is_following ? 'Unfollow' : 'Follow';
-        button.classList.toggle('bg-primary');
-        button.classList.toggle('text-white');
-        button.classList.toggle('bg-gray-200');
-        button.classList.toggle('text-gray-700');
-    });
-}
-</script>
+<script src="{% static 'js/follow.js' %}"></script>
 {% endif %}
+{% endblock %}
 {% endblock %}
 

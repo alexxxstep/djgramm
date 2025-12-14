@@ -4,7 +4,7 @@ import factory
 from django.contrib.auth import get_user_model
 from factory.django import DjangoModelFactory, ImageField
 
-from app.models import Like, Post, PostImage, Profile, Tag
+from app.models import Follow, Like, Post, PostImage, Profile, Tag
 
 User = get_user_model()
 
@@ -94,3 +94,13 @@ class LikeFactory(DjangoModelFactory):
 
     user = factory.SubFactory(UserFactory)
     post = factory.SubFactory(PostFactory)
+
+
+class FollowFactory(DjangoModelFactory):
+    """Factory for Follow model (intermediate model for ManyToManyField)."""
+
+    class Meta:
+        model = Follow
+
+    follower = factory.SubFactory(UserFactory)
+    following = factory.SubFactory(UserFactory)
