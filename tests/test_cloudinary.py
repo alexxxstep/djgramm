@@ -48,9 +48,17 @@ class TestProfileCloudinaryField:
             "API_SECRET": "",
         }
     )
-    def test_profile_avatar_accepts_file(self, profile, db):
+    @patch("cloudinary.uploader.upload_resource")
+    def test_profile_avatar_accepts_file(self, mock_upload, profile, db):
         """Test that Profile.avatar accepts file uploads."""
-        # When Cloudinary is not configured, it uses local storage fallback
+        # Mock Cloudinary upload to return a valid response
+        mock_upload.return_value = {
+            "public_id": "avatars/test_avatar",
+            "version": 1,
+            "url": "https://res.cloudinary.com/test/image/upload/v1/avatars/test_avatar.jpg",
+            "secure_url": "https://res.cloudinary.com/test/image/upload/v1/avatars/test_avatar.jpg",
+        }
+
         # Create a test image
         img = Image.new("RGB", (100, 100), color="red")
         buffer = BytesIO()
@@ -108,10 +116,17 @@ class TestPostImageCloudinaryField:
             "API_SECRET": "",
         }
     )
-    def test_post_image_accepts_file(self, post, db):
+    @patch("cloudinary.uploader.upload_resource")
+    def test_post_image_accepts_file(self, mock_upload, post, db):
         """Test that PostImage.image accepts file uploads."""
-        # When Cloudinary is not configured,
-        # it uses local storage fallback
+        # Mock Cloudinary upload to return a valid response
+        mock_upload.return_value = {
+            "public_id": "post_images/test_image",
+            "version": 1,
+            "url": "https://res.cloudinary.com/test/image/upload/v1/post_images/test_image.jpg",
+            "secure_url": "https://res.cloudinary.com/test/image/upload/v1/post_images/test_image.jpg",
+        }
+
         # Create a test image
         img = Image.new("RGB", (200, 200), color="blue")
         buffer = BytesIO()

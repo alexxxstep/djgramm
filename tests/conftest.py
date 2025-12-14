@@ -1,5 +1,7 @@
 """Pytest fixtures for DJGramm tests."""
 
+from unittest.mock import patch
+
 import pytest
 from django.test import Client
 
@@ -76,7 +78,21 @@ def post(db, user):
 
 
 @pytest.fixture
-def post_with_image(db, user, tmp_path):
+def mock_cloudinary_upload():
+    """Mock Cloudinary upload to prevent actual API calls in tests."""
+    with patch("cloudinary.uploader.upload_resource") as mock_upload:
+        # Return a mock response that CloudinaryField expects
+        mock_upload.return_value = {
+            "public_id": "test/test_image",
+            "version": 1,
+            "url": "https://res.cloudinary.com/test/image/upload/v1/test/test_image.jpg",
+            "secure_url": "https://res.cloudinary.com/test/image/upload/v1/test/test_image.jpg",
+        }
+        yield mock_upload
+
+
+@pytest.fixture
+def post_with_image(db, user, tmp_path, mock_cloudinary_upload):
     """Create a post with an image."""
     from io import BytesIO
 

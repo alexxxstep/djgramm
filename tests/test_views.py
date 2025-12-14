@@ -180,8 +180,7 @@ class TestProfileView:
 
     def test_profile_is_following_false_for_anonymous(self, client, user):
         """Test profile shows is_following=False for anonymous users."""
-        response = client.get(reverse("profile",
-         kwargs={"username": user.username}))  # fmt: skip
+        response = client.get(reverse("profile", kwargs={"username": user.username}))
         assert response.status_code == 200
         assert response.context["is_following"] is False
 
