@@ -122,7 +122,9 @@ class TestProfileView:
 
     def test_profile_view(self, client, user):
         """Test viewing a user profile."""
-        response = client.get(reverse("profile", kwargs={"username": user.username}))
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
         assert response.status_code == 200
         assert user.username in response.content.decode()
 
@@ -136,7 +138,9 @@ class TestProfileView:
 
     def test_profile_not_found(self, client, db):
         """Test 404 for non-existent user."""
-        response = client.get(reverse("profile", kwargs={"username": "nonexistent"}))
+        response = client.get(
+            reverse("profile", kwargs={"username": "nonexistent"})
+        )
         assert response.status_code == 404
 
     # =============================================================================
@@ -146,14 +150,18 @@ class TestProfileView:
     def test_profile_shows_followers_count(self, client, user, user2, db):
         """Test profile shows followers count."""
         Follow.objects.create(follower=user2, following=user)
-        response = client.get(reverse("profile", kwargs={"username": user.username}))
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
         assert response.status_code == 200
         assert response.context["followers_count"] == 1
 
     def test_profile_shows_following_count(self, client, user, user2, db):
         """Test profile shows following count."""
         Follow.objects.create(follower=user, following=user2)
-        response = client.get(reverse("profile", kwargs={"username": user.username}))
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
         assert response.status_code == 200
         assert response.context["following_count"] == 1
 
@@ -180,7 +188,9 @@ class TestProfileView:
 
     def test_profile_is_following_false_for_anonymous(self, client, user):
         """Test profile shows is_following=False for anonymous users."""
-        response = client.get(reverse("profile", kwargs={"username": user.username}))
+        response = client.get(
+            reverse("profile", kwargs={"username": user.username})
+        )
         assert response.status_code == 200
         assert response.context["is_following"] is False
 
@@ -253,7 +263,9 @@ class TestPostCreateView:
             },
         )
         assert response.status_code == 302  # Redirect after success
-        assert Post.objects.filter(author=user, caption="New post caption").exists()
+        assert Post.objects.filter(
+            author=user, caption="New post caption"
+        ).exists()
 
 
 class TestPostUpdateView:
@@ -364,7 +376,9 @@ class TestTagPostsView:
 
     def test_tag_not_found(self, client, db):
         """Test 404 for non-existent tag."""
-        response = client.get(reverse("tag_posts", kwargs={"slug": "nonexistent"}))
+        response = client.get(
+            reverse("tag_posts", kwargs={"slug": "nonexistent"})
+        )
         assert response.status_code == 404
 
 
@@ -412,7 +426,9 @@ class TestNewsFeedView:
         user.profile.refresh_from_db()
         assert user.profile.last_news_feed_visit is not None
 
-    def test_news_feed_empty_when_no_following(self, authenticated_client, user, db):
+    def test_news_feed_empty_when_no_following(
+        self, authenticated_client, user, db
+    ):
         """Test news feed is empty when not following anyone."""
         response = authenticated_client.get(reverse("news_feed"))
         assert response.status_code == 200
@@ -430,14 +446,18 @@ class TestToggleFollowView:
         )
         assert response.status_code == 302  # Redirect to login
 
-    def test_toggle_follow_requires_post(self, authenticated_client, user2, db):
+    def test_toggle_follow_requires_post(
+        self, authenticated_client, user2, db
+    ):
         """Test toggle_follow requires POST method."""
         response = authenticated_client.get(
             reverse("toggle_follow", kwargs={"username": user2.username})
         )
         assert response.status_code == 405  # Method not allowed
 
-    def test_toggle_follow_success(self, authenticated_client, user, user2, db):
+    def test_toggle_follow_success(
+        self, authenticated_client, user, user2, db
+    ):
         """Test successful follow."""
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": user2.username})
@@ -447,7 +467,9 @@ class TestToggleFollowView:
         assert data["is_following"] is True
         assert user.following.filter(id=user2.id).exists()
 
-    def test_toggle_follow_unfollow(self, authenticated_client, user, user2, db):
+    def test_toggle_follow_unfollow(
+        self, authenticated_client, user, user2, db
+    ):
         """Test successful unfollow."""
         # First follow
         user.following.add(user2)
@@ -460,7 +482,9 @@ class TestToggleFollowView:
         assert data["is_following"] is False
         assert not user.following.filter(id=user2.id).exists()
 
-    def test_toggle_follow_cannot_follow_self(self, authenticated_client, user, db):
+    def test_toggle_follow_cannot_follow_self(
+        self, authenticated_client, user, db
+    ):
         """Test cannot follow yourself."""
         response = authenticated_client.post(
             reverse("toggle_follow", kwargs={"username": user.username})
@@ -499,7 +523,9 @@ class TestFollowersListView:
         )
         assert response.status_code == 200  # Accessible without login
 
-    def test_followers_list_accessible(self, authenticated_client, user, user2, db):
+    def test_followers_list_accessible(
+        self, authenticated_client, user, user2, db
+    ):
         """Test followers list is accessible to authenticated users."""
         # user2 follows user
         user2.following.add(user)
@@ -568,7 +594,9 @@ class TestFollowingListView:
         )
         assert response.status_code == 200  # Accessible without login
 
-    def test_following_list_accessible(self, authenticated_client, user, user2, db):
+    def test_following_list_accessible(
+        self, authenticated_client, user, user2, db
+    ):
         """Test following list is accessible to authenticated users."""
         # user follows user2
         user.following.add(user2)
