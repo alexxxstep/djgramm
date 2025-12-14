@@ -2,8 +2,9 @@
 
 import pytest
 from django.db import IntegrityError
+from django.utils import timezone
 
-from app.models import Like, Post, PostImage, Profile, Tag, User
+from app.models import Follow, Like, Post, PostImage, Profile, Tag, User
 
 
 class TestUserModel:
@@ -67,6 +68,15 @@ class TestProfileModel:
         assert profile.full_name == "Test User"
         assert profile.bio == "Test bio"
 
+    def test_profile_avatar_field_type(self, profile):
+        """Test that Profile.avatar is CloudinaryField."""
+        from cloudinary.models import CloudinaryField
+
+        field = Profile._meta.get_field("avatar")
+        assert isinstance(field, CloudinaryField)
+        # Note: folder parameter is passed but not stored as attribute
+        assert field.blank is True
+
 
 class TestTagModel:
     """Tests for Tag model."""
@@ -116,8 +126,19 @@ class TestPostModel:
 
     def test_post_ordering(self, user, db):
         """Test that posts are ordered by -created_at."""
-        post1 = Post.objects.create(author=user, caption="First")
-        post2 = Post.objects.create(author=user, caption="Second")
+
+        now = timezone.now()
+        post1 = Post.objects.create(
+            author=user,
+            caption="First",
+            created_at=now,  # fmt: skip
+        )
+        post2 = Post.objects.create(
+            author=user,
+            caption="Second",
+            created_at=now + timezone.timedelta(seconds=1),
+        )
+
         posts = list(Post.objects.all())
         assert posts[0] == post2  # Newer first
         assert posts[1] == post1
@@ -142,18 +163,45 @@ class TestPostImageModel:
         image = post_with_image.images.first()
         assert str(image) == f"Image 0 for Post #{post_with_image.pk}"
 
+    def test_post_image_field_type(self, db):
+        """Test that PostImage.image is CloudinaryField."""
+        from cloudinary.models import CloudinaryField
+
+        field = PostImage._meta.get_field("image")
+        assert isinstance(field, CloudinaryField)
+        # Note: folder parameter is passed but not stored as attribute
+        assert field.blank is False
+
     def test_post_image_ordering(self, post, db):
         """Test that images are ordered by order field."""
+        from io import BytesIO
+
         from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        # Create test images
+        img1_data = BytesIO()
+        img1_pil = Image.new("RGB", (100, 100), color="red")
+        img1_pil.save(img1_data, format="JPEG")
+        img1_data.seek(0)
+
+        img0_data = BytesIO()
+        img0_pil = Image.new("RGB", (100, 100), color="blue")
+        img0_pil.save(img0_data, format="JPEG")
+        img0_data.seek(0)
 
         img1 = PostImage.objects.create(
             post=post,
-            image=SimpleUploadedFile("1.jpg", b"content", "image/jpeg"),
+            image=SimpleUploadedFile(
+                "1.jpg", img1_data.getvalue(), content_type="image/jpeg"
+            ),
             order=1,
         )
         img0 = PostImage.objects.create(
             post=post,
-            image=SimpleUploadedFile("0.jpg", b"content", "image/jpeg"),
+            image=SimpleUploadedFile(
+                "0.jpg", img0_data.getvalue(), content_type="image/jpeg"
+            ),
             order=0,
         )
 
@@ -189,3 +237,225 @@ class TestLikeModel:
         Like.objects.create(user=user, post=post2)
 
         assert user.likes.count() == 2
+
+
+class TestFollowModel:
+    """Tests for Follow model."""
+
+    def test_create_follow(self, user, user2, db):
+        """Test creating a follow relationship."""
+        follow = Follow.objects.create(follower=user, following=user2)
+        assert follow.follower == user
+        assert follow.following == user2
+        assert follow.created_at is not None
+
+    def test_follow_str(self, user, user2, db):
+        """Test follow string representation."""
+        follow = Follow.objects.create(follower=user, following=user2)
+        assert str(follow) == f"{user.username} follows {user2.username}"
+
+    def test_follow_unique_together(self, user, user2, db):
+        """Test that user can only follow another user once."""
+        Follow.objects.create(follower=user, following=user2)
+        with pytest.raises(IntegrityError):
+            Follow.objects.create(follower=user, following=user2)
+
+    def test_user_can_follow_multiple_users(self, user, user2, db):
+        """Test that user can follow multiple different users."""
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@example.com",
+            password="testpass123",
+        )
+        Follow.objects.create(follower=user, following=user2)
+        Follow.objects.create(follower=user, following=user3)
+        assert user.following.count() == 2
+
+    def test_follow_ordering(self, user, user2, db):
+        """Test that follows are ordered by -created_at."""
+        follow1 = Follow.objects.create(follower=user, following=user2)
+        follow2 = Follow.objects.create(
+            follower=user2, following=user
+        )  # Reverse follow
+        follows = list(Follow.objects.all())
+        assert follows[0] == follow2  # Newer first
+        assert follows[1] == follow1
+
+
+class TestUserFollowMethods:
+    """Tests for User follow helper methods."""
+
+    def test_get_followers_count(self, user, user2, db):
+        """Test get_followers_count method."""
+        assert user.get_followers_count() == 0
+        Follow.objects.create(follower=user2, following=user)
+        assert user.get_followers_count() == 1
+
+    def test_get_following_count(self, user, user2, db):
+        """Test get_following_count method."""
+        assert user.get_following_count() == 0
+        Follow.objects.create(follower=user, following=user2)
+        assert user.get_following_count() == 1
+
+    def test_is_following_true(self, user, user2, db):
+        """Test is_following returns True when following."""
+        Follow.objects.create(follower=user, following=user2)
+        assert user.is_following(user2) is True
+
+    def test_is_following_false(self, user, user2, db):
+        """Test is_following returns False when not following."""
+        assert user.is_following(user2) is False
+
+    def test_is_following_with_none(self, user):
+        """Test is_following handles None gracefully."""
+        assert user.is_following(None) is False
+
+    def test_related_names_work(self, user, user2, db):
+        """Test that related_name attributes work correctly."""
+        Follow.objects.create(follower=user, following=user2)
+        # user.following = User objects (ManyToManyField)
+        assert user.following.contains(user2)
+        # user.following_set = Follow objects where user is follower
+        assert user.following_set.filter(following=user2).exists()
+        # user2.followers = User objects (ManyToManyField reverse)
+        assert user2.followers.contains(user)
+        # user2.followers_set = Follow objects where user2 is being followed
+        assert user2.followers_set.filter(follower=user).exists()
+
+    def test_follow_method(self, user, user2, db):
+        """Test follow method creates Follow relationship."""
+        follow, created = user.follow(user2)
+        assert created is True
+        assert isinstance(follow, Follow)
+        assert follow.follower == user
+        assert follow.following == user2
+        assert user.is_following(user2) is True
+
+    def test_follow_method_idempotent(self, user, user2, db):
+        """Test that follow method is idempotent (no duplicates)."""
+        follow1, created1 = user.follow(user2)
+        assert created1 is True
+        follow2, created2 = user.follow(user2)
+        assert created2 is False
+        assert follow1 == follow2
+        assert user.following.count() == 1
+
+    def test_follow_method_prevents_self_follow(self, user, db):
+        """Test that user cannot follow themselves."""
+        follow, created = user.follow(user)
+        assert created is False
+        assert follow is None
+        assert user.following.count() == 0
+
+    def test_follow_method_with_invalid_user(self, user, db):
+        """Test follow method handles invalid user gracefully."""
+        follow, created = user.follow(None)
+        assert created is False
+        assert follow is None
+
+    def test_unfollow_method(self, user, user2, db):
+        """Test unfollow method removes Follow relationship."""
+        Follow.objects.create(follower=user, following=user2)
+        assert user.is_following(user2) is True
+
+        result = user.unfollow(user2)
+        assert result is True
+        assert user.is_following(user2) is False
+        assert user.following.count() == 0
+
+    def test_unfollow_method_when_not_following(self, user, user2, db):
+        """Test unfollow method when not following returns False."""
+        assert user.is_following(user2) is False
+        result = user.unfollow(user2)
+        assert result is False
+
+    def test_unfollow_method_with_invalid_user(self, user, db):
+        """Test unfollow method handles invalid user gracefully."""
+        result = user.unfollow(None)
+        assert result is False
+
+
+class TestUserUnreadNewsCount:
+    """Tests for get_unread_news_count method."""
+
+    def test_unread_count_when_never_visited(self, user, user2, db):
+        """Test unread count when never visited news feed."""
+        # user follows user2
+        user.following.add(user2)
+        # user2 creates a post
+        Post.objects.create(author=user2, caption="New post")
+        # Should count all posts from followed users
+        assert user.get_unread_news_count() == 1
+
+    def test_unread_count_excludes_own_posts(self, user, user2, db):
+        """Test that own posts are not counted."""
+        user.following.add(user2)
+        # user creates own post
+        Post.objects.create(author=user, caption="My post")
+        # user2 creates a post
+        Post.objects.create(author=user2, caption="Followed post")
+        # Should only count user2's post (not own)
+        assert user.get_unread_news_count() == 1
+
+    def test_unread_count_after_visit(self, user, user2, db):
+        """Test unread count after visiting news feed."""
+        from datetime import timedelta
+
+        user.following.add(user2)
+        # Use fixed time points to avoid timing issues
+        now = timezone.now()
+        visit_time = now - timedelta(days=1)
+        old_post_time = now - timedelta(days=2)
+
+        # Create post before visit
+        # Note: auto_now_add=True ignores created_at in create(),
+        # so we use update() after creation
+        old_post = Post.objects.create(author=user2, caption="Old post")
+        Post.objects.filter(pk=old_post.pk).update(created_at=old_post_time)
+
+        # Set last visit
+        user.profile.last_news_feed_visit = visit_time
+        user.profile.save()
+
+        # Create post after visit
+        new_post = Post.objects.create(author=user2, caption="New post")
+        Post.objects.filter(pk=new_post.pk).update(created_at=now)
+
+        # Refresh from DB to get updated created_at
+        old_post.refresh_from_db()
+        new_post.refresh_from_db()
+
+        # Refresh user profile to ensure last_news_feed_visit is loaded
+        user.profile.refresh_from_db()
+
+        # Verify timestamps are correct
+        assert old_post.created_at < user.profile.last_news_feed_visit
+        assert new_post.created_at > user.profile.last_news_feed_visit
+
+        # Should only count new post
+        count = user.get_unread_news_count()
+        error_msg = (
+            f"Expected 1, got {count}. "
+            f"Old post: {old_post.created_at}, "
+            f"New post: {new_post.created_at}, "
+            f"Visit: {user.profile.last_news_feed_visit}"
+        )
+        assert count == 1, error_msg
+
+    def test_unread_count_zero_when_no_following(self, user, db):
+        """Test unread count is 0 when not following anyone."""
+        assert user.get_unread_news_count() == 0
+
+    def test_unread_count_multiple_followed_users(self, user, user2, db):
+        """Test unread count with multiple followed users."""
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@example.com",
+            password="testpass123",
+        )
+        user.following.add(user2, user3)
+        # Create posts from both followed users
+        Post.objects.create(author=user2, caption="Post from user2")
+        Post.objects.create(author=user3, caption="Post from user3")
+        # Should count both
+        assert user.get_unread_news_count() == 2

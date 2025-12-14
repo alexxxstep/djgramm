@@ -4,6 +4,10 @@ import os
 import sys
 from pathlib import Path
 
+# Cloudinary settings
+import cloudinary
+import cloudinary.api
+import cloudinary.uploader
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -33,6 +37,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Cloudinary
+    "cloudinary",
+    "cloudinary_storage",
     # Local apps
     "app.apps.DjgrammAppConfig",
 ]
@@ -47,6 +54,43 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Django Debug Toolbar Configuration (тільки для DEBUG)
+if DEBUG:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE = [
+        "debug_toolbar.middleware.DebugToolbarMiddleware"
+    ] + MIDDLEWARE
+    INTERNAL_IPS = ["127.0.0.1", "localhost"]
+    # Для Docker
+    import socket
+
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS += [ip[:-1] + "1" for ip in ips]
+
+    # Additional settings for Debug Toolbar
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TEMPLATE_CONTEXT": True,
+        "SHOW_COLLAPSED": True,
+    }
+
+    # Settings for SQL Panel
+    DEBUG_TOOLBAR_PANELS = [
+        "debug_toolbar.panels.history.HistoryPanel",
+        "debug_toolbar.panels.versions.VersionsPanel",
+        "debug_toolbar.panels.timer.TimerPanel",
+        "debug_toolbar.panels.settings.SettingsPanel",
+        "debug_toolbar.panels.headers.HeadersPanel",
+        "debug_toolbar.panels.request.RequestPanel",
+        "debug_toolbar.panels.sql.SQLPanel",
+        "debug_toolbar.panels.staticfiles.StaticFilesPanel",
+        "debug_toolbar.panels.templates.TemplatesPanel",
+        "debug_toolbar.panels.cache.CachePanel",
+        "debug_toolbar.panels.signals.SignalsPanel",
+        # "debug_toolbar.panels.logging.LoggingPanel",
+        "debug_toolbar.panels.redirects.RedirectsPanel",
+        "debug_toolbar.panels.profiling.ProfilingPanel",
+    ]
 
 # WhiteNoise settings for serving static files
 WHITENOISE_USE_FINDERS = (
@@ -66,6 +110,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "app.context_processors.unread_news_count",
             ],
         },
     },
@@ -145,9 +190,46 @@ if not DEBUG:
         "whitenoise.storage.CompressedManifestStaticFilesStorage"
     )
 
+# =============================================================================
 # Media files
+# =============================================================================
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# =============================================================================
+# Cloudinary Configuration
+# =============================================================================
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.environ.get("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET", ""),
+}
+
+# Use Cloudinary for media files (only if credentials are provided)
+cloud_name = CLOUDINARY_STORAGE["CLOUD_NAME"]
+api_key = CLOUDINARY_STORAGE["API_KEY"]
+api_secret = CLOUDINARY_STORAGE["API_SECRET"]
+
+if cloud_name and api_key and api_secret:
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    cloudinary.config(
+        cloud_name=cloud_name,
+        api_key=api_key,
+        api_secret=api_secret,
+    )
+else:
+    # When Cloudinary credentials are not provided:
+    # - Don't set DEFAULT_FILE_STORAGE (uses Django's default local storage)
+    # - CloudinaryField will use local storage for new uploads
+    # - However, if database contains public_id from previous Cloudinary uploads,
+    #   CloudinaryField may still try to generate Cloudinary URLs
+    # - Solution: Configure Cloudinary with empty values to prevent errors,
+    #   but CloudinaryField should use local storage when DEFAULT_FILE_STORAGE
+    #   is not set to MediaCloudinaryStorage
+    # - For existing public_id values, they will try to use Cloudinary URLs
+    #   which won't work. Consider migrating data or using real Cloudinary credentials.
+    pass
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

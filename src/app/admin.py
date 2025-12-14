@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Like, Post, PostImage, Profile, Tag, User
+from .models import Comment, Follow, Like, Post, PostImage, Profile, Tag, User
 
 
 class ProfileInline(admin.StackedInline):
@@ -56,3 +56,28 @@ class LikeAdmin(admin.ModelAdmin):
 
     list_display = ["user", "post", "created_at"]
     list_filter = ["created_at"]
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    """Admin for Comment model."""
+
+    list_display = ["author", "post", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["text", "author__email", "author__username"]
+    ordering = ["created_at"]
+
+
+@admin.register(Follow)
+class FollowAdmin(admin.ModelAdmin):
+    """Admin for Follow model."""
+
+    list_display = ["follower", "following", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = [
+        "follower__email",
+        "follower__username",
+        "following__email",
+        "following__username",
+    ]
+    ordering = ["created_at"]

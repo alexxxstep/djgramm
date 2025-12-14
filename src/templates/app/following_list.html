@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ target_user.username }}'s Following | DJGramm{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h1 class="text-2xl font-semibold mb-6">
+            <a href="{% url 'profile' username=target_user.username %}" class="hover:underline">
+                {{ target_user.username }}
+            </a>
+            <span class="text-gray-500 font-normal">'s Following</span>
+        </h1>
+
+        {% if follows %}
+        <div class="space-y-4">
+            {% for follow in follows %}
+            <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-200 rounded-lg px-2">
+                <div class="flex items-center space-x-4 flex-1">
+                    <!-- Avatar -->
+                    <a href="{% url 'profile' username=follow.following.username %}">
+                        {% if follow.following.profile.avatar %}
+                        <img src="{{ follow.following.profile.avatar.url }}"
+                             alt="{{ follow.following.username }}"
+                             class="w-12 h-12 rounded-full object-cover">
+                        {% else %}
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold">
+                            {{ follow.following.username|first|upper }}
+                        </div>
+                        {% endif %}
+                    </a>
+
+                    <!-- User Info -->
+                    <div class="flex-1">
+                        <a href="{% url 'profile' username=follow.following.username %}" class="font-semibold hover:underline">
+                            {{ follow.following.username }}
+                        </a>
+                        {% if follow.following.profile.full_name %}
+                        <p class="text-sm text-gray-500">{{ follow.following.profile.full_name }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Follow/Unfollow Button -->
+                {% if user.is_authenticated and user != follow.following %}
+                    {% if follow.following.id in user_following_ids %}
+                    <button class="follow-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
+                            data-username="{{ follow.following.username }}"
+                            data-following="true">
+                        Unfollow
+                    </button>
+                    {% else %}
+                    <button class="follow-btn px-4 py-2 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-opacity-90 transition"
+                            data-username="{{ follow.following.username }}"
+                            data-following="false">
+                        Follow
+                    </button>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% include "app/_pagination.html" %}
+        {% else %}
+        <p class="text-gray-500 text-center py-8">Not following anyone yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% block extra_js %}
+{% load static %}
+{% if user.is_authenticated %}
+<script src="{% static 'js/follow.js' %}"></script>
+{% endif %}
+{% endblock %}
+{% endblock %}
+

@@ -8,11 +8,13 @@ on:
       - main
       - master
       - develop
+      - dev4
   pull_request:
     branches:
       - main
       - master
       - develop
+      - dev4
   workflow_dispatch: # Allow manual trigger
 
 env:
@@ -25,6 +27,10 @@ env:
   TESTING: 'True'
   ALLOWED_HOSTS: localhost,127.0.0.1
   PYTHON_VERSION: '3.12'
+  # Cloudinary credentials для тестів (dummy значення)
+  CLOUDINARY_CLOUD_NAME: test_cloud
+  CLOUDINARY_API_KEY: test_key
+  CLOUDINARY_API_SECRET: test_secret
 
 jobs:
   # =============================================================================
@@ -199,13 +205,24 @@ jobs:
           cd src
           uv run python manage.py makemigrations --check --dry-run
 
+      - name: Test Cloudinary configuration
+        run: |
+          cd src
+          uv run python manage.py shell -c "from django.conf import settings; assert hasattr(settings, 'CLOUDINARY_STORAGE')"
+
   # =============================================================================
   # BUILD STAGE
   # =============================================================================
   build-docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') || github.event_name == 'pull_request'
+    if: |
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/develop' ||
+        github.ref == 'refs/heads/dev4')) ||
+      github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -228,7 +245,12 @@ jobs:
   build-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/master' ||
+       github.ref == 'refs/heads/develop' ||
+       github.ref == 'refs/heads/dev4')
     needs: [lint, test, test-django-check]
     permissions:
       contents: read
@@ -269,7 +291,7 @@ jobs:
         with:
           context: .
           file: ./docker/Dockerfile
-          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev4') }}
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
             ghcr.io/${{ github.repository }}:latest
@@ -282,9 +304,50 @@ jobs:
         with:
           context: .
           file: ./docker/Dockerfile
-          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev4') }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/djgramm:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/djgramm:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # DEPLOY STAGE (Optional - requires secrets configuration)
+  # =============================================================================
+  # Для використання deploy job потрібно налаштувати GitHub Secrets:
+  # - DEPLOY_HOST: 46.224.86.224
+  # - DEPLOY_USER: djgramm
+  # - DEPLOY_PATH: /home/djgramm/djgramm
+  # - SSH_PRIVATE_KEY: приватний SSH ключ для доступу до сервера
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    # Deploy тільки якщо всі secrets налаштовані та push на main/master
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      secrets.DEPLOY_HOST != '' &&
+      secrets.DEPLOY_USER != '' &&
+      secrets.SSH_PRIVATE_KEY != ''
+    needs: [lint, test, test-django-check, build-push]
+    environment:
+      name: production
+      url: https://46.224.86.224
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin main
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate
+            docker compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+            docker image prune -f

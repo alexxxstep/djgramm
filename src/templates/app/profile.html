@@ -28,6 +28,20 @@
                    class="inline-block px-4 py-1.5 border border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-50">
                     Edit Profile
                 </a>
+                {% elif user.is_authenticated %}
+                    {% if is_following %}
+                    <button class="follow-btn px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
+                            data-username="{{ profile_user.username }}"
+                            data-following="true">
+                        Unfollow
+                    </button>
+                    {% else %}
+                    <button class="follow-btn px-4 py-1.5 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-opacity-90 transition"
+                            data-username="{{ profile_user.username }}"
+                            data-following="false">
+                        Follow
+                    </button>
+                    {% endif %}
                 {% endif %}
             </div>
 
@@ -36,6 +50,18 @@
                 <div>
                     <span class="font-semibold">{{ posts_count }}</span>
                     <span class="text-gray-500">posts</span>
+                </div>
+                <div>
+                    <a href="{% url 'followers_list' username=profile_user.username %}" class="hover:underline">
+                        <span class="font-semibold" id="followers-count">{{ followers_count }}</span>
+                        <span class="text-gray-500">followers</span>
+                    </a>
+                </div>
+                <div>
+                    <a href="{% url 'following_list' username=profile_user.username %}" class="hover:underline">
+                        <span class="font-semibold">{{ following_count }}</span>
+                        <span class="text-gray-500">following</span>
+                    </a>
                 </div>
             </div>
 
@@ -95,4 +121,11 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+{% if user.is_authenticated %}
+<script src="{% static 'js/follow.js' %}"></script>
+{% endif %}
 {% endblock %}

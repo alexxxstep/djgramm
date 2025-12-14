@@ -9,8 +9,16 @@ until pg_isready -h db -p 5432 -U postgres; do
 done
 echo "PostgreSQL is ready!"
 
+# Install dev dependencies if in DEBUG mode (before migrations)
+if [ "$DEBUG" = "True" ]; then
+    echo "Installing dev dependencies..."
+    cd /app || cd /app/src || true
+    uv sync --group dev --frozen 2>/dev/null || uv sync --group dev 2>/dev/null || true
+fi
+
 # Run migrations
 echo "Running migrations..."
+cd /app || cd /app/src || true
 uv run python manage.py migrate --noinput
 
 # Collect static files (only in production)
