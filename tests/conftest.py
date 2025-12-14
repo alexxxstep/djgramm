@@ -1,5 +1,7 @@
 """Pytest fixtures for DJGramm tests."""
 
+from unittest.mock import patch
+
 import pytest
 from django.test import Client
 
@@ -76,7 +78,56 @@ def post(db, user):
 
 
 @pytest.fixture
-def post_with_image(db, user, tmp_path):
+def mock_cloudinary_upload():
+    """Mock Cloudinary upload to prevent actual API calls in tests."""
+    import cloudinary.uploader
+    from cloudinary.models import CloudinaryField
+
+    upload_result = {
+        "public_id": "test/test_image",
+        "version": 1,
+        "url": (
+            "https://res.cloudinary.com/test/image/upload/"
+            "v1/test/test_image.jpg"
+        ),
+        "secure_url": (
+            "https://res.cloudinary.com/test/image/upload/"
+            "v1/test/test_image.jpg"
+        ),
+    }
+
+    with patch("cloudinary.uploader.upload_resource") as mock_upload:
+        mock_upload.return_value = upload_result
+
+        # Patch CloudinaryField's pre_save to extract public_id
+        original_pre_save = CloudinaryField.pre_save
+
+        def patched_pre_save(self, obj, add):
+            """Patched pre_save that ensures public_id string is returned."""
+            value = getattr(obj, self.attname)
+            # If it's a file-like object, upload it
+            if value and hasattr(value, "read"):
+                # Call the mocked upload_resource
+                result = cloudinary.uploader.upload_resource(value, **{})
+                # Extract public_id from the result dict
+                if isinstance(result, dict):
+                    return result.get("public_id", "test/test_image")
+                # If result is already a string, return it
+                return str(result) if result else value
+            # If value is already set (not a file), return it as-is
+            return value
+
+        CloudinaryField.pre_save = patched_pre_save
+
+        try:
+            yield mock_upload
+        finally:
+            # Restore original pre_save
+            CloudinaryField.pre_save = original_pre_save
+
+
+@pytest.fixture
+def post_with_image(db, user, tmp_path, mock_cloudinary_upload):
     """Create a post with an image."""
     from io import BytesIO
 

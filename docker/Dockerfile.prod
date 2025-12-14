@@ -51,7 +51,8 @@ RUN mkdir -p staticfiles media \
     && chown -R appuser:appuser /app
 
 # Collect static files
-RUN SECRET_KEY=build-key python manage.py collectstatic --noinput
+# Set DEBUG=0 to avoid importing debug_toolbar (not installed in production)
+RUN SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput
 
 # Switch to non-root user
 USER appuser
