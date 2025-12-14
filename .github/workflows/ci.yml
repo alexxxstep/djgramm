@@ -319,13 +319,11 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    # Deploy тільки якщо всі secrets налаштовані та push на main/master
+    # Deploy тільки при push на main/master
+    # Примітка: якщо secrets не налаштовані, step завершиться з помилкою, але workflow продовжиться
     if: |
       github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
-      secrets.DEPLOY_HOST != '' &&
-      secrets.DEPLOY_USER != '' &&
-      secrets.SSH_PRIVATE_KEY != ''
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     needs: [lint, test, test-django-check, build-push]
     environment:
       name: production
@@ -334,7 +332,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if deploy secrets are configured
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || \
+             [ -z "${{ secrets.DEPLOY_USER }}" ] || \
+             [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "deploy_enabled=false" >> $GITHUB_OUTPUT
+            echo "⚠️  Deploy secrets not configured. Skipping deployment."
+          else
+            echo "deploy_enabled=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to server
+        if: steps.check_secrets.outputs.deploy_enabled == 'true'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_HOST }}
