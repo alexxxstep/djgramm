@@ -172,7 +172,7 @@ class TestPostImageModel:
         # Note: folder parameter is passed but not stored as attribute
         assert field.blank is False
 
-    def test_post_image_ordering(self, post, db):
+    def test_post_image_ordering(self, post, db, mock_cloudinary_upload):
         """Test that images are ordered by order field."""
         from io import BytesIO
 
