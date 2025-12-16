@@ -28,6 +28,8 @@ services:
       - media_data:/app/media
     ports:
       - '9000:9000'
+    env_file:
+      - .env
     environment:
       - DEBUG=True
       - SECRET_KEY=dev-secret-key-change-in-production

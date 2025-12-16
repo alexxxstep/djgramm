@@ -1,5 +1,6 @@
 """Models for DJGramm."""
 
+from cloudinary.models import CloudinaryField
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.urls import reverse
@@ -90,7 +91,8 @@ class Profile(models.Model):
     )
     full_name = models.CharField(max_length=100, blank=True)
     bio = models.TextField(max_length=500, blank=True)
-    avatar = models.ImageField(upload_to="avatars/", blank=True)
+    # avatar = models.ImageField(upload_to="avatars/", blank=True)
+    avatar = CloudinaryField("image", folder="avatars", blank=True)
     last_news_feed_visit = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
@@ -141,7 +143,8 @@ class PostImage(models.Model):
     post = models.ForeignKey(  # fmt: skip
         Post, on_delete=models.CASCADE, related_name="images"
     )
-    image = models.ImageField(upload_to="posts/")
+    # image = models.ImageField(upload_to="posts/")
+    image = CloudinaryField("image", folder="posts")
     order = models.PositiveIntegerField(default=0)
 
     class Meta:

@@ -68,6 +68,15 @@ class TestProfileModel:
         assert profile.full_name == "Test User"
         assert profile.bio == "Test bio"
 
+    def test_profile_avatar_field_type(self, profile):
+        """Test that Profile.avatar is CloudinaryField."""
+        from cloudinary.models import CloudinaryField
+
+        field = Profile._meta.get_field("avatar")
+        assert isinstance(field, CloudinaryField)
+        # Note: folder parameter is passed but not stored as attribute
+        assert field.blank is True
+
 
 class TestTagModel:
     """Tests for Tag model."""
@@ -154,18 +163,45 @@ class TestPostImageModel:
         image = post_with_image.images.first()
         assert str(image) == f"Image 0 for Post #{post_with_image.pk}"
 
+    def test_post_image_field_type(self, db):
+        """Test that PostImage.image is CloudinaryField."""
+        from cloudinary.models import CloudinaryField
+
+        field = PostImage._meta.get_field("image")
+        assert isinstance(field, CloudinaryField)
+        # Note: folder parameter is passed but not stored as attribute
+        assert field.blank is False
+
     def test_post_image_ordering(self, post, db):
         """Test that images are ordered by order field."""
+        from io import BytesIO
+
         from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        # Create test images
+        img1_data = BytesIO()
+        img1_pil = Image.new("RGB", (100, 100), color="red")
+        img1_pil.save(img1_data, format="JPEG")
+        img1_data.seek(0)
+
+        img0_data = BytesIO()
+        img0_pil = Image.new("RGB", (100, 100), color="blue")
+        img0_pil.save(img0_data, format="JPEG")
+        img0_data.seek(0)
 
         img1 = PostImage.objects.create(
             post=post,
-            image=SimpleUploadedFile("1.jpg", b"content", "image/jpeg"),
+            image=SimpleUploadedFile(
+                "1.jpg", img1_data.getvalue(), content_type="image/jpeg"
+            ),
             order=1,
         )
         img0 = PostImage.objects.create(
             post=post,
-            image=SimpleUploadedFile("0.jpg", b"content", "image/jpeg"),
+            image=SimpleUploadedFile(
+                "0.jpg", img0_data.getvalue(), content_type="image/jpeg"
+            ),
             order=0,
         )
 
