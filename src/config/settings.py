@@ -55,7 +55,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "app.middleware.HealthCheckMiddleware",  # Must be BEFORE SecurityMiddleware
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # WhiteNoise middleware - only in DEBUG mode (nginx serves static files in production)
+    *(["whitenoise.middleware.WhiteNoiseMiddleware"] if DEBUG else []),
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -201,21 +202,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_URL = "/static/"
-# Frontend built files are in frontend/dist (outside src/)
-# In Docker: BASE_DIR = /app, frontend is mounted at /app/frontend
-# On host: BASE_DIR = src/, frontend is at project root
-frontend_dist = BASE_DIR.parent / "frontend" / "dist"
-# Fallback to absolute path if parent doesn't work (Docker case)
+# Frontend built files are in frontend/dist
+# In Docker: BASE_DIR = /app, frontend is at /app/frontend/dist
+# On host: BASE_DIR = src/, frontend is at project root/frontend/dist
+frontend_dist = BASE_DIR / "frontend" / "dist"
+# Fallback to parent path if not found (host development case)
 if not frontend_dist.exists():
-    frontend_dist = BASE_DIR / "frontend" / "dist"
-STATICFILES_DIRS = [frontend_dist]
+    frontend_dist = BASE_DIR.parent / "frontend" / "dist"
+# Only add to STATICFILES_DIRS if it exists
+STATICFILES_DIRS = [frontend_dist] if frontend_dist.exists() else []
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise configuration (only in production)
-if not DEBUG:
-    STATICFILES_STORAGE = (
-        "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    )
+# WhiteNoise configuration
+# Disabled when nginx serves static files (production with nginx)
+# Enable only if Django serves static files directly (without nginx)
+# if not DEBUG:
+#     STATICFILES_STORAGE = (
+#         "whitenoise.storage.CompressedManifestStaticFilesStorage"
+#     )
 
 # =============================================================================
 # Media files
