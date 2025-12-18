@@ -33,7 +33,8 @@ RUN echo "=== Templates found ===" && find ./templates -name "*.html" | head -10
 
 # Build frontend assets (output goes to frontend/dist)
 # Use production mode to ensure proper CSS generation
-RUN NODE_ENV=production npm run build
+# Show Tailwind debug output
+RUN NODE_ENV=production npm run build 2>&1 | grep -E "(Tailwind|templates|CSS)" || true
 
 # Debug: Check generated CSS size
 RUN echo "=== Generated CSS size ===" && ls -lh frontend/dist/styles.css || true
