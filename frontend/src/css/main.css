@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles can be added here */
+
+/* Comment input field - ensure text is ALWAYS visible in dark mode */
+/* Using maximum specificity to override any conflicting styles */
+/* Light mode: dark text */
+#comment-input,
+input#comment-input,
+form#comment-form input#comment-input {
+  color: #111827 !important; /* text-gray-900 for light mode - темний текст */
+}
+
+/* Dark mode: white text - максимальна специфічність */
+html.dark #comment-input,
+html.dark input#comment-input,
+html.dark form#comment-form input#comment-input,
+.dark #comment-input,
+.dark input#comment-input,
+.dark form#comment-form input#comment-input {
+  color: #ffffff !important; /* WHITE text for dark mode - максимально видимий */
+}
+
+#comment-input::placeholder {
+  color: #9ca3af !important; /* text-gray-400 */
+}
+
+html.dark #comment-input::placeholder,
+.dark #comment-input::placeholder {
+  color: #9ca3af !important; /* text-gray-400 - світліший для темної теми */
+}
+
+#comment-input:focus {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+html.dark #comment-input:focus,
+.dark #comment-input:focus {
+  color: #ffffff !important; /* WHITE text */
+}
+
+/* Also handle when input has value */
+html.dark #comment-input[value],
+.dark #comment-input[value] {
+  color: #ffffff !important;
+}
+
+/* Also handle edit input for comments */
+.edit-input {
+  color: #111827 !important;
+}
+
+html.dark .edit-input,
+.dark .edit-input {
+  color: #ffffff !important;
+  background-color: #374151 !important; /* dark:bg-gray-700 */
+}
+
+.edit-input::placeholder {
+  color: #9ca3af !important;
+}
+
+html.dark .edit-input::placeholder,
+.dark .edit-input::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Comment text - ensure proper colors for both light and dark modes */
+/* Light mode: dark text (text-gray-800) */
+.comment-text,
+.comment-text-content {
+  color: #1f2937 !important; /* text-gray-800 for light mode - темний текст */
+}
+
+/* Dark mode: light text (text-gray-200) */
+html.dark .comment-text,
+html.dark .comment-text-content,
+.dark .comment-text,
+.dark .comment-text-content {
+  color: #e5e7eb !important; /* text-gray-200 for dark mode - світлий текст */
+}
+
+/* Ensure comment text links are also visible */
+.comment-text a {
+  color: inherit;
+}
+
+/* Light mode: links inherit dark color */
+.comment-text a {
+  color: #1f2937 !important; /* text-gray-800 */
+}
+
+/* Dark mode: links inherit light color */
+html.dark .comment-text a,
+.dark .comment-text a {
+  color: #e5e7eb !important; /* text-gray-200 */
+}

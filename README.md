@@ -5,8 +5,9 @@ Instagram-like photo sharing application built with Django.
 ## Tech Stack
 
 - **Backend:** Python 3.12+, Django 5.x
+- **Frontend:** Webpack, Tailwind CSS, ES6 Modules
 - **Database:** PostgreSQL 16
-- **Package Manager:** UV
+- **Package Manager:** UV (Python), npm (Node.js)
 - **Containerization:** Docker + Docker Compose
 - **Web Server:** Nginx + Gunicorn
 - **CI/CD:** GitLab CI, GitHub Actions
@@ -15,7 +16,7 @@ Instagram-like photo sharing application built with Django.
 
 ### Prerequisites
 
-- Python 3.12+, UV, Docker & Docker Compose
+- Python 3.12+, UV, Node.js 20+, npm, Docker & Docker Compose
 
 ### Development Setup
 
@@ -23,7 +24,15 @@ Instagram-like photo sharing application built with Django.
 # Clone and install
 git clone <repository-url>
 cd djgramm
+
+# Install Python dependencies
 uv sync
+
+# Install Node.js dependencies
+npm install
+
+# Build frontend assets
+npm run build
 
 # Configure environment
 cp .env.example .env
@@ -41,11 +50,16 @@ uv run python manage.py createsuperuser
 uv run python ../scripts/seed_data.py
 uv run python manage.py sync_tags
 
-# Run development server
+# Build frontend assets (in watch mode for development)
+npm run dev
+
+# In another terminal, run development server
 uv run python manage.py runserver 9000
 ```
 
 Open: http://127.0.0.1:9000/
+
+**Note:** For development, run `npm run dev` in watch mode to automatically rebuild frontend assets on changes.
 
 ### Docker Development
 
@@ -77,6 +91,19 @@ Hashtags in captions are automatically extracted and converted to clickable tags
 - **Example:** `"Beautiful #sunset #travel photos!"`
 - **Result:** Tags `sunset` and `travel` are created and linked to the post
 - **For existing posts:** Run `python manage.py sync_tags`
+
+## Frontend Development
+
+```bash
+# Build frontend assets (production)
+npm run build
+
+# Build frontend assets (development with watch mode)
+npm run dev
+
+# Analyze bundle size
+npm run build:analyze
+```
 
 ## Testing
 
@@ -111,13 +138,15 @@ SECURE_SSL_REDIRECT=True
 ### 2. Deploy
 
 ```bash
-# Build and start
+# Build and start (frontend assets are built automatically in Dockerfile)
 docker compose -f docker-compose.prod.yml up -d --build
 
 # Run migrations
 docker compose -f docker-compose.prod.yml exec web uv run python manage.py migrate
 docker compose -f docker-compose.prod.yml exec web uv run python manage.py createsuperuser
 ```
+
+**Note:** Frontend assets are automatically built during Docker image build process.
 
 ### 3. SSL Certificates
 

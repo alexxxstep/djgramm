@@ -1,13 +1,9 @@
 // Follow/Unfollow button functionality
-(function() {
-    function getCsrfToken() {
-        // Try multiple ways to get CSRF token
-        const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                     document.querySelector('meta[name=csrf-token]')?.content ||
-                     document.querySelector('[name=csrf-token]')?.content;
-        return token;
-    }
+import { getCsrfToken } from './utils/csrf.js';
+import { ajaxPost, showLoading, hideLoading } from './utils/ajax.js';
 
+// Export initialization function for dynamic import
+export function initFollow() {
     function initFollowButtons() {
         const csrfToken = getCsrfToken();
         if (!csrfToken) {
@@ -33,42 +29,32 @@
                 console.log('Follow button clicked:', username, 'isFollowing:', isFollowing);
 
                 // Disable button during request
-                const originalText = this.textContent;
-                this.disabled = true;
-                this.textContent = '...';
+                showLoading(this);
 
                 try {
-                    const response = await fetch(`/profile/${username}/follow/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': csrfToken,
-                            'Content-Type': 'application/json',
-                        },
+                    const data = await ajaxPost(`/profile/${username}/follow/`, {}, {
+                        errorMessage: 'Failed to follow/unfollow user. Please try again.'
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
                     console.log('Response data:', data);
 
                     if (data.error) {
                         alert(data.error);
-                        this.disabled = false;
-                        this.textContent = originalText;
+                        hideLoading(this);
                         return;
                     }
 
                     // Update button text and style
+                    const newText = data.is_following ? 'Unfollow' : 'Follow';
                     if (data.is_following) {
-                        this.textContent = 'Unfollow';
+                        this.textContent = newText;
                         this.dataset.following = 'true';
+                        this.dataset.originalText = newText; // Update original text for hideLoading
                         this.classList.remove('bg-primary', 'text-white', 'hover:bg-opacity-90');
                         this.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
                     } else {
-                        this.textContent = 'Follow';
+                        this.textContent = newText;
                         this.dataset.following = 'false';
+                        this.dataset.originalText = newText; // Update original text for hideLoading
                         this.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
                         this.classList.add('bg-primary', 'text-white', 'hover:bg-opacity-90');
                     }
@@ -82,7 +68,7 @@
                     // Update all follow buttons for this user (in case there are multiple on page)
                     document.querySelectorAll(`.follow-btn[data-username="${username}"]`).forEach(btn => {
                         if (btn !== this) {
-                            btn.textContent = data.is_following ? 'Unfollow' : 'Follow';
+                            btn.textContent = newText;
                             btn.dataset.following = data.is_following ? 'true' : 'false';
                             if (data.is_following) {
                                 btn.classList.remove('bg-primary', 'text-white', 'hover:bg-opacity-90');
@@ -93,12 +79,12 @@
                             }
                         }
                     });
+
+                    // Hide loading indicator after successful update
+                    hideLoading(this);
                 } catch (error) {
-                    console.error('Error:', error);
-                    alert('Something went wrong. Please try again.');
-                    this.textContent = originalText;
-                } finally {
-                    this.disabled = false;
+                    // Error already handled in ajaxPost
+                    hideLoading(this);
                 }
             });
         });
@@ -110,5 +96,12 @@
     } else {
         initFollowButtons();
     }
-})();
+}
+
+// Auto-initialize when loaded directly (not via dynamic import)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFollow);
+} else {
+    initFollow();
+}
 

@@ -1,5 +1,11 @@
 // Post form functionality - Image upload, drag & drop, reordering
-(function() {
+import { getCsrfToken } from './utils/csrf.js';
+import { ajaxPost } from './utils/ajax.js';
+
+// Export initialization function for dynamic import
+export function initPostForm() {
+    console.log('post_form.js: Initializing...');
+
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
     const newImagesSection = document.getElementById('new-images-section');
@@ -10,17 +16,24 @@
     const charCount = document.getElementById('char-count');
     const existingImagesContainer = document.getElementById('existing-images');
 
-    if (!form) return;
+    console.log('post_form.js: Elements found', {
+        dropzone: !!dropzone,
+        fileInput: !!fileInput,
+        form: !!form,
+        formsetContainer: !!formsetContainer
+    });
+
+    if (!form) {
+        console.warn('post_form.js: Form not found, exiting');
+        return;
+    }
+
+    console.log('post_form.js: Form found, continuing initialization');
 
     let newFiles = [];
     const MAX_FILES = 10;
     const existingImagesCount = existingImagesContainer ? existingImagesContainer.querySelectorAll('[data-image-id]').length : 0;
     const postId = window.POST_ID || null;
-
-    function getCSRFToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-               document.querySelector('meta[name=csrf-token]')?.content || '';
-    }
 
     // Character counter
     if (captionInput && charCount) {
@@ -103,17 +116,8 @@
                 order.push(parseInt(item.dataset.imageId));
             });
 
-            fetch('/post/' + postId + '/reorder-images/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ order: order })
-            }).then(function(response) {
-                if (!response.ok) {
-                    console.error('Failed to save image order');
-                }
+            ajaxPost('/post/' + postId + '/reorder-images/', { order: order }, {
+                errorMessage: 'Failed to save image order.'
             }).catch(function(error) {
                 console.error('Error:', error);
             });
@@ -259,27 +263,102 @@
     // FORM SUBMIT
     // =========================================================================
     form.addEventListener('submit', function(e) {
+        // Don't prevent default if there are no new files - let form submit normally
+        if (newFiles.length === 0) {
+            return true;
+        }
+
         e.preventDefault();
         var existingCount = formsetContainer.querySelectorAll('.existing-delete-cb').length;
 
-        newFiles.forEach(function(file, index) {
-            var inputIndex = existingCount + index;
-            var input = formsetContainer.querySelector('[name="images-' + inputIndex + '-image"]');
-            if (!input) {
-                var div = document.createElement('div');
-                div.className = 'image-form';
-                div.innerHTML = '<input type="file" name="images-' + inputIndex + '-image" class="new-image-input" accept="image/*">';
-                formsetContainer.appendChild(div);
-                input = div.querySelector('input');
+        // Ensure we have enough form fields for all new files
+        var totalNeeded = existingCount + newFiles.length;
+        var totalFormsInput = formsetContainer.querySelector('[name$="-TOTAL_FORMS"]');
+        var currentTotal = parseInt(totalFormsInput.value) || 0;
+
+        // Remove all existing new-image-input elements first
+        formsetContainer.querySelectorAll('.new-image-input').forEach(function(inp) {
+            var parent = inp.parentNode;
+            if (parent && parent.classList.contains('image-form')) {
+                parent.remove();
+            } else {
+                inp.remove();
             }
-            var dt = new DataTransfer();
-            dt.items.add(file);
-            input.files = dt.files;
         });
 
-        var totalFormsInput = formsetContainer.querySelector('[name$="-TOTAL_FORMS"]');
-        totalFormsInput.value = existingCount + newFiles.length;
+        // Create new file inputs for each file using DataTransfer
+        var filesAssigned = 0;
+        newFiles.forEach(function(file, index) {
+            var inputIndex = existingCount + index;
+            var div = document.createElement('div');
+            div.className = 'image-form';
+            div.dataset.formIndex = inputIndex;
+
+            // Create a new file input
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.name = 'images-' + inputIndex + '-image';
+            input.className = 'new-image-input';
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            input.multiple = false;
+
+            // Use DataTransfer to assign the file
+            try {
+                if (typeof DataTransfer !== 'undefined') {
+                    var dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;
+                    filesAssigned++;
+                    console.log('✓ File assigned:', file.name, 'to input:', input.name, 'Size:', file.size);
+                } else {
+                    throw new Error('DataTransfer not supported');
+                }
+            } catch (error) {
+                console.error('✗ Error assigning file:', error, file.name);
+                // If DataTransfer fails, we can't proceed - show error
+                alert('Error: Your browser does not support file upload. Please use a modern browser.');
+                return false;
+            }
+
+            div.appendChild(input);
+            formsetContainer.appendChild(div);
+        });
+
+        // Update total forms count
+        totalFormsInput.value = totalNeeded;
+
+        // Debug: verify files are assigned
+        var allFileInputs = formsetContainer.querySelectorAll('input[type="file"].new-image-input');
+        console.log('Total new file inputs created:', allFileInputs.length);
+        var filesWithData = 0;
+        allFileInputs.forEach(function(inp) {
+            if (inp.files && inp.files.length > 0) {
+                filesWithData++;
+                console.log('✓ Input with file:', inp.name, 'File:', inp.files[0].name, 'Size:', inp.files[0].size);
+            } else {
+                console.warn('✗ Input without file:', inp.name);
+            }
+        });
+        console.log('Summary - New files:', newFiles.length, 'Assigned:', filesAssigned, 'With data:', filesWithData);
+
+        // Verify files are assigned before submitting
+        if (newFiles.length > 0 && filesWithData === 0) {
+            alert('Error: Files were not properly attached to the form. Please try selecting files again or use a different browser.');
+            return false;
+        }
+
+        // Submit the form normally (not via AJAX, to handle file uploads)
+        console.log('Submitting form with', filesWithData, 'file(s)');
         form.submit();
     });
-})();
+}
+
+// Auto-initialize when loaded directly (not via dynamic import)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPostForm);
+} else {
+    // DOM is already ready
+    initPostForm();
+}
 

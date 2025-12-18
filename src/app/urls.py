@@ -6,6 +6,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Health check (for Docker healthcheck)
+    path("health/", views.health_check, name="health_check"),
     # Feed
     path("", views.FeedView.as_view(), name="feed"),
     path("news/", views.NewsFeedView.as_view(), name="news_feed"),
