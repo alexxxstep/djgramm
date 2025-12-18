@@ -1,57 +1,18 @@
 /** @type {import('tailwindcss').Config} */
 const path = require('path');
-const fs = require('fs');
-
-// Determine template paths - check both Docker and host paths
-const templatePaths = [];
-const possibleTemplatePaths = [
-  path.resolve(__dirname, 'src/templates/**/*.html'), // Host development
-  path.resolve(__dirname, 'templates/**/*.html'), // Docker (src/ copied to /app)
-];
-
-// Add paths that exist
-possibleTemplatePaths.forEach(templatePath => {
-  const basePath = templatePath.replace('/**/*.html', '');
-  if (fs.existsSync(basePath)) {
-    templatePaths.push(templatePath);
-    console.log(`[Tailwind] Found templates at: ${templatePath}`);
-  } else {
-    console.log(`[Tailwind] Templates not found at: ${templatePath}`);
-  }
-});
-
-// Always include JS files
-const jsPath = path.resolve(__dirname, 'frontend/src/js/**/*.js');
-
-// Templatetags path - check if exists
-const templatetagsPaths = [
-  path.resolve(__dirname, 'src/app/templatetags/**/*.py'), // Host development
-  path.resolve(__dirname, 'app/templatetags/**/*.py'), // Docker (src/ copied to /app)
-];
-const templatetagsPath = templatetagsPaths.find(p => {
-  const basePath = p.replace('/**/*.py', '');
-  const exists = fs.existsSync(basePath);
-  if (exists) {
-    console.log(`[Tailwind] Found templatetags at: ${p}`);
-  }
-  return exists;
-}) || templatetagsPaths[0]; // Fallback to first path
-
-// Debug: Log final content paths
-console.log(`[Tailwind] Content paths:`, [
-  ...templatePaths,
-  jsPath,
-  templatetagsPath,
-  path.resolve(__dirname, '**/*.html'),
-]);
 
 module.exports = {
   darkMode: 'class', // Enable class-based dark mode
   content: [
-    ...templatePaths,
-    jsPath,
-    templatetagsPath,
-    // Fallback patterns
+    // Templates - try all possible paths (Docker and host)
+    path.resolve(__dirname, 'templates/**/*.html'), // Docker: src/templates copied to /app/templates
+    path.resolve(__dirname, 'src/templates/**/*.html'), // Host development
+    // Templatetags - try all possible paths
+    path.resolve(__dirname, 'app/templatetags/**/*.py'), // Docker: src/app/templatetags copied to /app/app/templatetags
+    path.resolve(__dirname, 'src/app/templatetags/**/*.py'), // Host development
+    // JavaScript files
+    path.resolve(__dirname, 'frontend/src/js/**/*.js'),
+    // Fallback - catch all HTML files
     path.resolve(__dirname, '**/*.html'),
   ],
   theme: {

@@ -11,8 +11,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install Node.js dependencies
-RUN npm ci --only=production || npm install
+# Install Node.js dependencies (including dev dependencies for build)
+# We need dev dependencies for webpack, tailwind, postcss, etc.
+RUN npm ci || npm install
 
 # Copy frontend source
 COPY frontend/ ./frontend/
@@ -29,15 +30,19 @@ COPY src/app/templatetags/ ./app/templatetags/
 
 # Debug: List templates to verify they're copied
 RUN echo "=== Templates found ===" && find ./templates -name "*.html" | head -10 || true && \
-    echo "=== Templatetags found ===" && find ./app/templatetags -name "*.py" 2>/dev/null | head -5 || echo "No templatetags found"
+    echo "=== Templatetags found ===" && find ./app/templatetags -name "*.py" 2>/dev/null | head -5 || echo "No templatetags found" && \
+    echo "=== Current directory ===" && pwd && \
+    echo "=== Directory structure ===" && ls -la && \
+    echo "=== Templates directory ===" && ls -la ./templates/ 2>/dev/null || echo "Templates dir not found"
 
 # Build frontend assets (output goes to frontend/dist)
 # Use production mode to ensure proper CSS generation
-# Show Tailwind debug output
-RUN NODE_ENV=production npm run build 2>&1 | grep -E "(Tailwind|templates|CSS)" || true
+RUN NODE_ENV=production npm run build
 
-# Debug: Check generated CSS size
-RUN echo "=== Generated CSS size ===" && ls -lh frontend/dist/styles.css || true
+# Debug: Check generated CSS size and content
+RUN echo "=== Generated CSS size ===" && ls -lh frontend/dist/styles.css && \
+    echo "=== CSS first 50 lines ===" && head -50 frontend/dist/styles.css && \
+    echo "=== CSS contains Tailwind classes? ===" && grep -c "\.bg-gray\|\.text-gray\|\.flex\|\.grid" frontend/dist/styles.css || echo "No Tailwind classes found"
 
 # Remove templates after build (they'll be copied again in production stage)
 RUN rm -rf ./templates ./app 2>/dev/null || true
@@ -117,6 +122,10 @@ CMD ["gunicorn", "config.wsgi:application", \
      "--worker-class", "gthread", \
      "--worker-tmp-dir", "/dev/shm", \
      "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--capture-output"]
+
+
      "--error-logfile", "-", \
      "--capture-output"]
 
