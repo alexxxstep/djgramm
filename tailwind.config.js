@@ -14,6 +14,9 @@ possibleTemplatePaths.forEach(templatePath => {
   const basePath = templatePath.replace('/**/*.html', '');
   if (fs.existsSync(basePath)) {
     templatePaths.push(templatePath);
+    console.log(`[Tailwind] Found templates at: ${templatePath}`);
+  } else {
+    console.log(`[Tailwind] Templates not found at: ${templatePath}`);
   }
 });
 
@@ -27,8 +30,20 @@ const templatetagsPaths = [
 ];
 const templatetagsPath = templatetagsPaths.find(p => {
   const basePath = p.replace('/**/*.py', '');
-  return fs.existsSync(basePath);
+  const exists = fs.existsSync(basePath);
+  if (exists) {
+    console.log(`[Tailwind] Found templatetags at: ${p}`);
+  }
+  return exists;
 }) || templatetagsPaths[0]; // Fallback to first path
+
+// Debug: Log final content paths
+console.log(`[Tailwind] Content paths:`, [
+  ...templatePaths,
+  jsPath,
+  templatetagsPath,
+  path.resolve(__dirname, '**/*.html'),
+]);
 
 module.exports = {
   darkMode: 'class', // Enable class-based dark mode
