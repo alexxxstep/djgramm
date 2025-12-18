@@ -10,6 +10,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -661,6 +662,7 @@ def add_comment(request, pk):
 # =============================================================================
 
 
+@csrf_exempt
 def health_check(request):
     """Simple health check endpoint for Docker healthcheck."""
     from django.http import HttpResponse
