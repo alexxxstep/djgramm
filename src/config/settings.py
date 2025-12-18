@@ -25,9 +25,15 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(
-    ","
-)
+# ALLOWED_HOSTS - ensure localhost and 127.0.0.1 are always included for health checks
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# Strip whitespace and ensure localhost and 127.0.0.1 are always included
+_allowed_hosts = [h.strip() for h in _allowed_hosts if h.strip()]
+if "localhost" not in _allowed_hosts:
+    _allowed_hosts.append("localhost")
+if "127.0.0.1" not in _allowed_hosts:
+    _allowed_hosts.append("127.0.0.1")
+ALLOWED_HOSTS = _allowed_hosts
 
 # Application definition
 INSTALLED_APPS = [

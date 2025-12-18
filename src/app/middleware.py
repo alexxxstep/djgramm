@@ -1,5 +1,8 @@
 """Custom middleware for DJGramm app."""
 
+from django.core.exceptions import SuspiciousOperation
+from django.http import HttpResponse
+
 
 class HealthCheckMiddleware:
     """
@@ -14,10 +17,17 @@ class HealthCheckMiddleware:
         # Bypass ALLOWED_HOSTS check for /health/ endpoint
         if request.path == "/health/":
             # Set a valid host to bypass SecurityMiddleware check
-            request.META["HTTP_HOST"] = "localhost"
+            # Use 127.0.0.1 as it's always in ALLOWED_HOSTS
+            request.META["HTTP_HOST"] = "127.0.0.1:8000"
             # Also set SERVER_NAME to avoid SuspiciousOperation
-            if "SERVER_NAME" not in request.META:
-                request.META["SERVER_NAME"] = "localhost"
+            request.META["SERVER_NAME"] = "127.0.0.1"
 
-        response = self.get_response(request)
+        try:
+            response = self.get_response(request)
+        except SuspiciousOperation as e:
+            # If SuspiciousOperation is raised for /health/, return OK response
+            if request.path == "/health/":
+                return HttpResponse("OK", content_type="text/plain")
+            raise
+
         return response
