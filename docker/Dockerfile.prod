@@ -125,7 +125,3 @@ CMD ["gunicorn", "config.wsgi:application", \
      "--error-logfile", "-", \
      "--capture-output"]
 
-
-     "--error-logfile", "-", \
-     "--capture-output"]
-
