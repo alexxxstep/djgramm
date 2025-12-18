@@ -18,15 +18,23 @@ RUN npm ci --only=production || npm install
 COPY frontend/ ./frontend/
 COPY webpack.config.js tailwind.config.js postcss.config.js ./
 
-# Copy templates for Tailwind CSS to scan (needed for content paths)
-# Templates are copied temporarily just for the build, then removed
+# Copy templates and templatetags for Tailwind CSS to scan (needed for content paths)
+# These are copied temporarily just for the build, then removed
 COPY src/templates/ ./templates/
+COPY src/app/templatetags/ ./app/templatetags/ 2>/dev/null || true
+
+# Debug: List templates to verify they're copied
+RUN echo "=== Templates found ===" && find ./templates -name "*.html" | head -10 || true
 
 # Build frontend assets (output goes to frontend/dist)
-RUN npm run build
+# Use production mode to ensure proper CSS generation
+RUN NODE_ENV=production npm run build
+
+# Debug: Check generated CSS size
+RUN echo "=== Generated CSS size ===" && ls -lh frontend/dist/styles.css || true
 
 # Remove templates after build (they'll be copied again in production stage)
-RUN rm -rf ./templates
+RUN rm -rf ./templates ./app 2>/dev/null || true
 
 # =============================================================================
 # Stage 2: Python Build
