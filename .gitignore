@@ -46,6 +46,22 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+nul
+NUL
 
 .cursor/
+
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Webpack
+frontend/dist/
+*.map
+
+# Package managers
+package-lock.json
 
