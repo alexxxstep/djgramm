@@ -24,7 +24,7 @@ class HealthCheckMiddleware:
 
         try:
             response = self.get_response(request)
-        except SuspiciousOperation as e:
+        except SuspiciousOperation:
             # If SuspiciousOperation is raised for /health/, return OK response
             if request.path == "/health/":
                 return HttpResponse("OK", content_type="text/plain")
