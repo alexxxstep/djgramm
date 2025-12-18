@@ -1,6 +1,7 @@
 """Views for DJGramm."""
 
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth import login
@@ -42,9 +43,19 @@ class FeedView(ListView):
 
     def get_queryset(self):
         """Show all posts with optimized queries."""
+        from django.db.models import Prefetch
+
         return Post.objects.select_related(
             "author", "author__profile"
-        ).prefetch_related("images", "tags", "likes", "comments")
+        ).prefetch_related(
+            Prefetch(
+                "images",
+                queryset=PostImage.objects.order_by("order"),
+            ),
+            "tags",
+            "likes",
+            "comments",
+        )
 
     def get_context_data(self, **kwargs):
         """Add user's liked posts and following status to context."""
@@ -62,9 +73,7 @@ class FeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = (
-                self.request.user.get_following_count()
-            )
+            context["following_count"] = self.request.user.get_following_count()
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -100,10 +109,20 @@ class NewsFeedView(ListView):
         following_ids = list(following_users.values_list("id", flat=True))
         following_ids.append(self.request.user.id)
 
+        from django.db.models import Prefetch
+
         return (
             Post.objects.filter(author_id__in=following_ids)
             .select_related("author", "author__profile")
-            .prefetch_related("images", "tags", "likes", "comments")
+            .prefetch_related(
+                Prefetch(
+                    "images",
+                    queryset=PostImage.objects.order_by("order"),
+                ),
+                "tags",
+                "likes",
+                "comments",
+            )
         )
 
     def get_context_data(self, **kwargs):
@@ -123,9 +142,7 @@ class NewsFeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = (
-                self.request.user.get_following_count()
-            )
+            context["following_count"] = self.request.user.get_following_count()
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -170,9 +187,16 @@ class ProfileView(DetailView):
     def get_context_data(self, **kwargs):
         """Add user posts to context."""
         context = super().get_context_data(**kwargs)
+        from django.db.models import Prefetch
+
         context["posts"] = (
             self.object.posts.select_related("author")
-            .prefetch_related("images")
+            .prefetch_related(
+                Prefetch(
+                    "images",
+                    queryset=PostImage.objects.order_by("order"),
+                )
+            )
             .order_by("-created_at")
         )
         context["posts_count"] = context["posts"].count()
@@ -182,9 +206,7 @@ class ProfileView(DetailView):
 
         # Check if current user is following target user
         if self.request.user.is_authenticated:
-            context["is_following"] = self.request.user.is_following(
-                self.object
-            )
+            context["is_following"] = self.request.user.is_following(self.object)
         else:
             context["is_following"] = False
 
@@ -252,9 +274,7 @@ class FollowingListView(ListView):
         Optimized with select_related to avoid N+1 queries.
         """
         # Get target user from URL
-        self.target_user = get_object_or_404(
-            User, username=self.kwargs["username"]
-        )
+        self.target_user = get_object_or_404(User, username=self.kwargs["username"])
 
         # Return Follow objects with optimized queries
         return (
@@ -320,8 +340,16 @@ class PostDetailView(DetailView):
 
     def get_queryset(self):
         """Optimize query."""
+        from django.db.models import Prefetch
+
         return Post.objects.select_related("author").prefetch_related(
-            "images", "tags", "likes", "comments__author"
+            Prefetch(
+                "images",
+                queryset=PostImage.objects.order_by("order"),
+            ),
+            "tags",
+            "likes",
+            "comments__author",
         )
 
     def get_context_data(self, **kwargs):
@@ -336,6 +364,8 @@ class PostDetailView(DetailView):
             context["user_liked"] = False
         context["comments"] = self.object.comments.select_related("author")
         context["likes_count"] = self.object.likes.count()
+        # Ensure images are ordered correctly
+        context["images"] = self.object.images.order_by("order")
         return context
 
 
@@ -359,8 +389,10 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         """Save post and images, sync tags."""
-        context = self.get_context_data()
-        image_formset = context["image_formset"]
+        logger = logging.getLogger(__name__)
+
+        # Rebuild formset with POST and FILES data
+        image_formset = PostImageFormSet(self.request.POST, self.request.FILES)
 
         form.instance.author = self.request.user
         self.object = form.save()
@@ -368,9 +400,50 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         # Sync tags from caption
         sync_post_tags(self.object, form.cleaned_data["caption"])
 
+        # Log formset state for debugging
+        logger.info(
+            f"Post {self.object.pk}: Formset total forms: {image_formset.total_form_count()}"
+        )
+        logger.info(
+            f"Post {self.object.pk}: Files in request.FILES: {list(self.request.FILES.keys())}"
+        )
+        for key in self.request.FILES.keys():
+            file = self.request.FILES[key]
+            logger.info(
+                f"Post {self.object.pk}: File '{key}': {file.name}, size: {file.size}"
+            )
+
+        # Set instance before validation
+        image_formset.instance = self.object
+
+        # Validate and save image formset
         if image_formset.is_valid():
-            image_formset.instance = self.object
-            image_formset.save()
+            saved_instances = image_formset.save(commit=False)
+            # Set order for each image based on form position
+            for index, img in enumerate(saved_instances):
+                img.order = index
+                img.save()
+            logger.info(
+                f"Post {self.object.pk}: Saved {len(saved_instances)} image instances"
+            )
+            for img in saved_instances:
+                logger.info(
+                    f"Post {self.object.pk}: Saved image {img.pk} - order {img.order} - {img.image}"
+                )
+                if hasattr(img.image, "url"):
+                    logger.info(f"Post {self.object.pk}: Image URL: {img.image.url}")
+        else:
+            # If formset is invalid, show errors
+            logger.error(
+                f"Post {self.object.pk}: Formset errors: {image_formset.errors}"
+            )
+            logger.error(
+                f"Post {self.object.pk}: Formset non_form_errors: {image_formset.non_form_errors()}"
+            )
+            for error_dict in image_formset.errors:
+                for _field, errors in error_dict.items():
+                    for error in errors:
+                        messages.error(self.request, f"Image error: {error}")
 
         messages.success(self.request, "Post created successfully!")
         return redirect(self.object.get_absolute_url())
@@ -410,8 +483,19 @@ class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         # Sync tags from caption
         sync_post_tags(self.object, form.cleaned_data["caption"])
 
+        # Validate and save image formset
         if image_formset.is_valid():
-            image_formset.save()
+            saved_instances = image_formset.save(commit=False)
+            # Set order for each image based on form position
+            for index, img in enumerate(saved_instances):
+                img.order = index
+                img.save()
+        else:
+            # If formset is invalid, show errors
+            for error_dict in image_formset.errors:
+                for _field, errors in error_dict.items():
+                    for error in errors:
+                        messages.error(self.request, f"Image error: {error}")
 
         messages.success(self.request, "Post updated successfully!")
         return redirect(self.object.get_absolute_url())
@@ -446,14 +530,30 @@ def toggle_like(request, pk):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
 
-    post = get_object_or_404(Post, pk=pk)
-    like, created = Like.objects.get_or_create(user=request.user, post=post)
+    from django.db import IntegrityError
 
-    if not created:
+    post = get_object_or_404(Post, pk=pk)
+
+    # Check if like already exists
+    try:
+        like = Like.objects.get(user=request.user, post=post)
+        # Like exists, remove it
         like.delete()
         liked = False
-    else:
-        liked = True
+    except Like.DoesNotExist:
+        # Like doesn't exist, create it
+        try:
+            Like.objects.create(user=request.user, post=post)
+            liked = True
+        except IntegrityError:
+            # Race condition: like was created by another request
+            # Try to get it again
+            try:
+                like = Like.objects.get(user=request.user, post=post)
+                liked = True
+            except Like.DoesNotExist:
+                # Still doesn't exist, something went wrong
+                liked = False
 
     return JsonResponse(
         {
@@ -472,9 +572,7 @@ def toggle_follow(request, username):
     target_user = get_object_or_404(User, username=username)
 
     if request.user == target_user:
-        return JsonResponse(
-            {"error": "You cannot follow yourself"}, status=400
-        )
+        return JsonResponse({"error": "You cannot follow yourself"}, status=400)
 
     # ManyToManyField approach - simpler and more efficient
     if request.user.following.filter(id=target_user.id).exists():
@@ -511,9 +609,7 @@ def add_comment(request, pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -544,6 +640,18 @@ def add_comment(request, pk):
         )
     except (json.JSONDecodeError, KeyError):
         return JsonResponse({"error": "Invalid data"}, status=400)
+
+
+# =============================================================================
+# Health Check
+# =============================================================================
+
+
+def health_check(request):
+    """Simple health check endpoint for Docker healthcheck."""
+    from django.http import HttpResponse
+
+    return HttpResponse("OK", content_type="text/plain")
 
 
 @login_required
@@ -586,9 +694,7 @@ def edit_comment(request, pk, comment_pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -629,9 +735,7 @@ def update_image_order(request, pk):
 
         # Update order for each image
         for index, image_id in enumerate(order_list):
-            PostImage.objects.filter(pk=image_id, post=post).update(
-                order=index
-            )
+            PostImage.objects.filter(pk=image_id, post=post).update(order=index)
 
         return JsonResponse({"success": True})
     except (json.JSONDecodeError, KeyError):
@@ -653,11 +757,19 @@ class TagPostsView(ListView):
 
     def get_queryset(self):
         """Filter posts by tag."""
+        from django.db.models import Prefetch
+
         self.tag = get_object_or_404(Tag, slug=self.kwargs["slug"])
         return (
             Post.objects.filter(tags=self.tag)
             .select_related("author")
-            .prefetch_related("images", "likes")
+            .prefetch_related(
+                Prefetch(
+                    "images",
+                    queryset=PostImage.objects.order_by("order"),
+                ),
+                "likes",
+            )
         )
 
     def get_context_data(self, **kwargs):
