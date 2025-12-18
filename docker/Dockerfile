@@ -37,8 +37,15 @@ RUN npm ci || npm install
 COPY frontend/ ./frontend/
 COPY webpack.config.js tailwind.config.js postcss.config.js ./
 
+# Copy templates for Tailwind CSS to scan (needed for content paths)
+# Templates are copied temporarily just for the build
+COPY src/templates/ ./templates/
+
 # Build frontend assets
 RUN npm run build
+
+# Remove templates after build (they'll be copied again with src/)
+RUN rm -rf ./templates
 
 # Copy entrypoint and fix line endings (CRLF -> LF) for Windows compatibility
 COPY docker/entrypoint.sh /entrypoint.sh

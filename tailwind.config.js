@@ -19,7 +19,16 @@ possibleTemplatePaths.forEach(templatePath => {
 
 // Always include JS files
 const jsPath = path.resolve(__dirname, 'frontend/src/js/**/*.js');
-const templatetagsPath = path.resolve(__dirname, 'src/app/templatetags/**/*.py');
+
+// Templatetags path - check if exists
+const templatetagsPaths = [
+  path.resolve(__dirname, 'src/app/templatetags/**/*.py'), // Host development
+  path.resolve(__dirname, 'app/templatetags/**/*.py'), // Docker (src/ copied to /app)
+];
+const templatetagsPath = templatetagsPaths.find(p => {
+  const basePath = p.replace('/**/*.py', '');
+  return fs.existsSync(basePath);
+}) || templatetagsPaths[0]; // Fallback to first path
 
 module.exports = {
   darkMode: 'class', // Enable class-based dark mode
