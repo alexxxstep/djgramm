@@ -16,6 +16,13 @@ if [ "$DEBUG" = "True" ]; then
     uv sync --group dev --frozen 2>/dev/null || uv sync --group dev 2>/dev/null || true
 fi
 
+# Build frontend assets (if Node.js is available and package.json exists)
+if [ -f "/app/package.json" ] || [ -f "/app/src/../package.json" ]; then
+    echo "Building frontend assets..."
+    cd /app || cd /app/src/.. || true
+    npm run build 2>/dev/null || echo "Frontend build skipped (Node.js not available or already built)"
+fi
+
 # Run migrations
 echo "Running migrations..."
 cd /app || cd /app/src || true

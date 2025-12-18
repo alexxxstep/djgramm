@@ -33,8 +33,17 @@ pythonpath = ["src"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["src/app"]
-omit = ["*/migrations/*", "*/__pycache__/*"]
+source = ["src"]
+omit = [
+    "*/migrations/*",
+    "*/__pycache__/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "*/conftest.py",
+    "*/manage.py",
+    "*/venv/*",
+    "*/.venv/*",
+]
 
 [tool.coverage.report]
 exclude_lines = [

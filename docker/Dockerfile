@@ -2,9 +2,12 @@
 
 FROM python:3.12-slim
 
-# Install system dependencies
+# Install system dependencies (including Node.js for frontend build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -23,6 +26,19 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies
 RUN uv sync --frozen --no-dev
+
+# Copy Node.js dependency files
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies
+RUN npm ci || npm install
+
+# Copy frontend source and config files
+COPY frontend/ ./frontend/
+COPY webpack.config.js tailwind.config.js postcss.config.js ./
+
+# Build frontend assets
+RUN npm run build
 
 # Copy entrypoint and fix line endings (CRLF -> LF) for Windows compatibility
 COPY docker/entrypoint.sh /entrypoint.sh

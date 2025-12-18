@@ -128,9 +128,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Run migrations
+        run: |
+          cd src
+          uv run python manage.py migrate --noinput
+          cd ..
+
       - name: Run pytest with coverage
         run: |
-          uv run pytest tests/ --cov=src/app --cov-report=term-missing --cov-report=xml
+          uv run pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml -v
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -195,17 +201,29 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Run migrations
+        run: |
+          cd src
+          uv run python manage.py migrate --noinput
+          cd ..
+
       - name: Run Django check
         run: |
-          uv run python src/manage.py check --deploy
+          cd src
+          uv run python manage.py check --deploy
+          cd ..
 
       - name: Check migrations
         run: |
-          uv run python src/manage.py makemigrations --check --dry-run
+          cd src
+          uv run python manage.py makemigrations --check --dry-run
+          cd ..
 
       - name: Test Cloudinary configuration
         run: |
-          uv run python src/manage.py shell -c "from django.conf import settings; assert hasattr(settings, 'CLOUDINARY_STORAGE')"
+          cd src
+          uv run python manage.py shell -c "from django.conf import settings; assert hasattr(settings, 'CLOUDINARY_STORAGE')"
+          cd ..
 
   # =============================================================================
   # BUILD STAGE

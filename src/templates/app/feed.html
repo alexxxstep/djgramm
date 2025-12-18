@@ -8,7 +8,7 @@
     {% if posts %}
         <div class="space-y-6">
             {% for post in posts %}
-            <article class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-300">
+            <article class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md dark:hover:shadow-lg transition-all duration-300">
                 <!-- Header -->
                 <div class="flex items-center justify-between p-4">
                     <a href="{% url 'profile' username=post.author.username %}" class="flex items-center space-x-3">
@@ -21,12 +21,12 @@
                             {{ post.author.username|first|upper }}
                         </div>
                         {% endif %}
-                        <span class="font-semibold text-gray-900">{{ post.author.username }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-gray-100">{{ post.author.username }}</span>
                     </a>
                     <!-- Follow/Unfollow Button -->
                     {% if user.is_authenticated and user != post.author %}
                         {% if post.author.id in user_following_ids %}
-                        <button class="follow-btn px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
+                        <button class="follow-btn px-4 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                                 data-username="{{ post.author.username }}"
                                 data-following="true">
                             Unfollow
@@ -49,8 +49,8 @@
                          class="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-300">
                 </a>
                 {% else %}
-                <a href="{% url 'post_detail' pk=post.pk %}" class="block w-full aspect-square bg-gray-100 flex items-center justify-center">
-                    <span class="text-gray-400">No image</span>
+                <a href="{% url 'post_detail' pk=post.pk %}" class="block w-full aspect-square bg-gray-100 dark:bg-gray-700 flex items-center justify-center transition-colors">
+                    <span class="text-gray-400 dark:text-gray-500">No image</span>
                 </a>
                 {% endif %}
 
@@ -60,7 +60,7 @@
                         <!-- Like button with count -->
                         <div class="flex flex-col items-center">
                             {% if user.is_authenticated %}
-                            <button class="like-btn {% if post.pk in user_liked_posts %}text-red-500{% endif %} hover:text-red-500 transition"
+                            <button class="like-btn {% if post.pk in user_liked_posts %}text-red-500{% else %}text-gray-700 dark:text-gray-300{% endif %} hover:text-red-500 transition"
                                     data-post-id="{{ post.pk }}"
                                     id="like-btn-{{ post.pk }}">
                                 <svg class="w-7 h-7"
@@ -71,7 +71,7 @@
                                 </svg>
                             </button>
                             {% else %}
-                            <a href="{% url 'login' %}" class="hover:text-red-500 transition">
+                            <a href="{% url 'login' %}" class="text-gray-700 dark:text-gray-300 hover:text-red-500 transition">
                                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
@@ -79,38 +79,38 @@
                             </a>
                             {% endif %}
                             {% if post.likes.count > 0 %}
-                            <span class="font-semibold text-gray-900 text-sm mt-1" id="likes-count-{{ post.pk }}">{{ post.likes.count }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-gray-100 text-sm mt-1" id="likes-count-{{ post.pk }}">{{ post.likes.count }}</span>
                             {% else %}
-                            <span class="font-semibold text-gray-900 text-sm mt-1 hidden" id="likes-count-{{ post.pk }}">0</span>
+                            <span class="font-semibold text-gray-900 dark:text-gray-100 text-sm mt-1 hidden" id="likes-count-{{ post.pk }}">0</span>
                             {% endif %}
                         </div>
 
                         <!-- Comment button with count -->
                         <div class="flex flex-col items-center">
-                            <a href="{% url 'post_detail' pk=post.pk %}" class="hover:text-gray-600 transition">
+                            <a href="{% url 'post_detail' pk=post.pk %}" class="text-gray-700 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-400 transition">
                                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                                 </svg>
                             </a>
                             {% if post.comments.count > 0 %}
-                            <span class="font-semibold text-gray-900 text-sm mt-1" id="comments-count-{{ post.pk }}">{{ post.comments.count }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-gray-100 text-sm mt-1" id="comments-count-{{ post.pk }}">{{ post.comments.count }}</span>
                             {% else %}
-                            <span class="font-semibold text-gray-900 text-sm mt-1 hidden" id="comments-count-{{ post.pk }}">0</span>
+                            <span class="font-semibold text-gray-900 dark:text-gray-100 text-sm mt-1 hidden" id="comments-count-{{ post.pk }}">0</span>
                             {% endif %}
                         </div>
                     </div>
 
                     <!-- Caption -->
                     {% if post.caption %}
-                    <p class="text-gray-800">
+                    <p class="text-gray-800 dark:text-gray-200">
                         <a href="{% url 'profile' username=post.author.username %}" class="font-semibold">{{ post.author.username }}</a>
                         {{ post.caption|linkify_hashtags|truncatewords:20 }}
                     </p>
                     {% endif %}
 
                     <!-- Time -->
-                    <p class="text-gray-400 text-xs mt-2 uppercase">
+                    <p class="text-gray-400 dark:text-gray-500 text-xs mt-2 uppercase">
                         {{ post.created_at|timesince }} ago
                     </p>
                 </div>
@@ -123,28 +123,28 @@
         <div class="text-center py-16">
             {% if is_news_feed and following_count == 0 and user.is_authenticated %}
                 <!-- Empty news feed message -->
-                <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-24 h-24 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
                           d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
-                <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     No posts in your news feed
                 </h2>
-                <p class="text-gray-500 mb-6">
+                <p class="text-gray-500 dark:text-gray-400 mb-6">
                     Follow users to see their posts here
                 </p>
                 <a href="{% url 'feed' %}"
-                   class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
+                   class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">
                     Discover Users
                 </a>
             {% else %}
                 <!-- Regular empty feed message -->
-                <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-24 h-24 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <h2 class="text-xl font-semibold text-gray-700 mb-2">No posts yet</h2>
-                <p class="text-gray-500 mb-6">Be the first to share something!</p>
+                <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No posts yet</h2>
+                <p class="text-gray-500 dark:text-gray-400 mb-6">Be the first to share something!</p>
                 {% if user.is_authenticated %}
                 <a href="{% url 'post_create' %}" class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90">
                     Create Post
@@ -163,7 +163,5 @@
 {% block extra_js %}
 {% load static %}
 {% if user.is_authenticated %}
-<script src="{% static 'js/feed.js' %}"></script>
-<script src="{% static 'js/follow.js' %}"></script>
 {% endif %}
 {% endblock %}

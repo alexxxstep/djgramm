@@ -353,6 +353,26 @@ class TestToggleLikeView:
         assert data["likes_count"] == 1
         assert Like.objects.filter(user=user, post=post).exists()
 
+    def test_like_race_condition(self, authenticated_client, post, user):
+        """Test that race condition in like creation is handled."""
+        # Simulate race condition by trying to like twice quickly
+        response1 = authenticated_client.post(
+            reverse("toggle_like", kwargs={"pk": post.pk})
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["liked"] is True
+
+        # Try to like again (should handle IntegrityError gracefully)
+        response2 = authenticated_client.post(
+            reverse("toggle_like", kwargs={"pk": post.pk})
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        # Should toggle to unlike
+        assert data2["liked"] is False
+        assert data2["likes_count"] == 0
+
     def test_unlike_post(self, authenticated_client, like):
         """Test unliking a post."""
         response = authenticated_client.post(

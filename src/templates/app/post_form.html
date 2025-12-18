@@ -125,5 +125,4 @@
     // Pass Django template variables to JavaScript
     window.POST_ID = {% if object %}{{ object.pk }}{% else %}null{% endif %};
 </script>
-<script src="{% static 'js/post_form.js' %}"></script>
 {% endblock %}

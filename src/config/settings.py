@@ -97,6 +97,17 @@ WHITENOISE_USE_FINDERS = (
     True  # Allow WhiteNoise to serve static files in DEBUG mode
 )
 
+# WhiteNoise cache settings for static files
+WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+
+
+def whitenoise_immutable_file_test(path, url):
+    """Test if a file should be cached as immutable."""
+    return url.startswith("/static/dist/")
+
+
+WHITENOISE_IMMUTABLE_FILE_TEST = whitenoise_immutable_file_test
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
@@ -181,7 +192,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+# Frontend built files are in frontend/dist (outside src/)
+# In Docker: BASE_DIR = /app, frontend is mounted at /app/frontend
+# On host: BASE_DIR = src/, frontend is at project root
+frontend_dist = BASE_DIR.parent / "frontend" / "dist"
+# Fallback to absolute path if parent doesn't work (Docker case)
+if not frontend_dist.exists():
+    frontend_dist = BASE_DIR / "frontend" / "dist"
+STATICFILES_DIRS = [frontend_dist]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # WhiteNoise configuration (only in production)
