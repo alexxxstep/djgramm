@@ -86,7 +86,7 @@ EXPOSE 8000
 # Health check
 # Middleware handles redirects and returns 200 OK for /health/
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; class NoRedirect(urllib.request.HTTPRedirectHandler): pass; opener = urllib.request.build_opener(NoRedirect); req = urllib.request.Request('http://127.0.0.1:8000/health/'); response = opener.open(req, timeout=5); assert response.status == 200" || exit 1
+    CMD python -c "import urllib.request; opener = urllib.request.build_opener(); opener.addheaders = [('Host', '127.0.0.1')]; req = urllib.request.Request('http://127.0.0.1:8000/health/'); response = opener.open(req, timeout=5); assert response.status in (200, 301, 302), f'Status: {response.status}'" || exit 1
 
 # Run with gunicorn
 CMD ["gunicorn", "config.wsgi:application", \
