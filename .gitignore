@@ -65,3 +65,10 @@ frontend/dist/
 # Package managers
 package-lock.json
 
+# YAML linting
+.yamllint
+
+
+
+
+

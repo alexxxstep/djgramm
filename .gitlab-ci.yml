@@ -9,13 +9,13 @@ variables:
   POSTGRES_DB: djgramm_test
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
-  DATABASE_URL: "postgres://postgres:postgres@postgres:5432/djgramm_test"
-  SECRET_KEY: "test-secret-key-for-ci"
-  DEBUG: "True"
-  TESTING: "True"
-  ALLOWED_HOSTS: "localhost,127.0.0.1"
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  DJANGO_SETTINGS_MODULE: "config.settings"
+  DATABASE_URL: 'postgres://postgres:postgres@postgres:5432/djgramm_test'
+  SECRET_KEY: 'test-secret-key-for-ci'
+  DEBUG: 'True'
+  TESTING: 'True'
+  ALLOWED_HOSTS: 'localhost,127.0.0.1'
+  PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+  DJANGO_SETTINGS_MODULE: 'config.settings'
 
 # Cache pip downloads
 cache:
@@ -91,7 +91,7 @@ build:docker:
   services:
     - docker:24-dind
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: '/certs'
     DOCKER_DRIVER: overlay2
   before_script:
     - docker info
@@ -113,7 +113,7 @@ build:push:
   services:
     - docker:24-dind
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: '/certs'
     DOCKER_DRIVER: overlay2
   before_script:
     - apk add --no-cache git
