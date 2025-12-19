@@ -49,7 +49,10 @@ RUN echo "=== Current directory ===" && pwd && \
 # Build frontend assets (output goes to frontend/dist)
 # Use production mode to ensure proper CSS generation
 # Capture build output to verify Tailwind is scanning templates
-RUN NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
+# Also verify that templates are readable before build
+RUN echo "=== Verifying templates are readable ===" && \
+    find ./templates -name "*.html" -exec head -5 {} \; | head -20 && \
+    NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
 
 # Debug: Verify Tailwind found templates and check generated CSS
 RUN echo "=== Tailwind build output ===" && \
