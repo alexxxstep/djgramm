@@ -92,16 +92,12 @@ export function initFollow() {
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initFollowButtons);
+      document.addEventListener('DOMContentLoaded', initFollowButtons);
     } else {
-        initFollowButtons();
+      initFollowButtons();
     }
-}
+  }
 
-// Auto-initialize when loaded directly (not via dynamic import)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFollow);
-} else {
-    initFollow();
-}
+  // Initialize immediately
+  initFollow();
 
