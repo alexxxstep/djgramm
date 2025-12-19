@@ -1,6 +1,6 @@
 /**
- * Centralized like button handler
- * Eliminates code duplication between feed.js and post_detail.js
+ * Centralized like button handler using event delegation
+ * Works for dynamically added buttons
  */
 
 import { ajaxPost } from '../../utils/ajax.js';
@@ -97,60 +97,40 @@ export async function toggleLike(postId, button, likesSpan = null) {
 }
 
 /**
- * Initialize like buttons
- * @param {string} selector - CSS selector for like buttons (default: '.like-btn')
- * @param {Object} options - Options
- * @param {boolean} options.skipPostDetail - Skip initialization on post detail pages
+ * Handle like button click using event delegation
  */
-export function initLikeButtons(selector = '.like-btn', options = {}) {
-  const { skipPostDetail = false } = options;
+async function handleLike(button) {
+  const postId = button.dataset.postId || button.id?.replace('like-btn-', '');
 
-  // Skip if on post detail page
-  if (skipPostDetail) {
-    const isPostDetailUrl = window.location.pathname.match(/^\/post\/\d+\/?$/);
-    const hasCommentsSection = document.getElementById('comments-section');
-    const hasPostMenu = document.querySelector('.post-menu');
-
-    if (isPostDetailUrl || (hasCommentsSection && hasPostMenu)) {
-      return;
-    }
+  if (!postId) {
+    console.error('Like button missing data-post-id or id attribute');
+    return;
   }
 
-  document.querySelectorAll(selector).forEach(btn => {
-    // Skip if handler already attached
-    if (btn.dataset.handlerAttached === 'true' || btn.dataset.postDetailHandler === 'true') {
-      return;
-    }
+  // Prevent double-click
+  if (button.dataset.processing === 'true') {
+    return;
+  }
 
-    btn.dataset.handlerAttached = 'true';
+  button.dataset.processing = 'true';
 
-    btn.addEventListener('click', async function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const button = this;
-      const postId = button.dataset.postId;
-
-      if (!postId) {
-        console.warn('Like button: postId not found');
-        return;
-      }
-
-      // Check if already processing
-      if (button.dataset.processing === 'true') {
-        return;
-      }
-
-      button.dataset.processing = 'true';
-
-      try {
-        await toggleLike(postId, button);
-      } catch (error) {
-        console.error('Error toggling like:', error);
-      } finally {
-        button.dataset.processing = 'false';
-      }
-    }, { once: false, passive: false });
-  });
+  try {
+    const likesSpan = document.getElementById(`likes-count-${postId}`);
+    await toggleLike(postId, button, likesSpan);
+  } catch (error) {
+    console.error('Error toggling like:', error);
+  } finally {
+    button.dataset.processing = 'false';
+  }
 }
 
+// Event delegation - catches clicks on like buttons anywhere in document
+document.addEventListener('click', function(e) {
+  // Check if click is on like button or inside it
+  const btn = e.target.closest('.like-btn, [id^="like-btn-"], [data-like-btn]');
+  if (btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleLike(btn);
+  }
+});

@@ -1,7 +1,7 @@
 // Post detail page functionality
 import { getCsrfToken } from './utils/csrf.js';
 import { ajaxPost } from './utils/ajax.js';
-import { toggleLike, updateLikeUI } from './modules/likes/likeHandler.js';
+// Like buttons are handled by event delegation in likeHandler.js
 
 // Prevent multiple initializations
 let isInitialized = false;
@@ -30,78 +30,10 @@ export function initPostDetail() {
     // =========================================================================
     // LIKE BUTTON
     // =========================================================================
+    // Like buttons are now handled by event delegation in likeHandler.js
+    // No initialization needed here
     function initLikeButton() {
-        // Try to get POST_ID from window or from button dataset
-        let postId = window.POST_ID;
-
-        // Fallback: try to get from like button dataset
-        if (!postId) {
-            const likeBtn = document.querySelector('.like-btn');
-            if (likeBtn) {
-                postId = likeBtn.dataset.postId;
-                if (postId) {
-                    window.POST_ID = postId; // Cache it
-                    console.log('post_detail.js: POST_ID found from button dataset:', postId);
-                }
-            }
-        }
-
-        if (!postId) {
-            console.warn('post_detail.js: POST_ID not found, skipping like button init');
-            return;
-        }
-
-        const likeBtn = document.getElementById(`like-btn-${postId}`);
-        if (!likeBtn) {
-            console.warn('post_detail.js: Like button not found for post', postId);
-            return;
-        }
-
-        console.log('post_detail.js: Like button found for post', postId);
-
-        // Check if handler already attached (possibly by feed.js)
-        let buttonToUse = likeBtn;
-        if (likeBtn.dataset.handlerAttached === 'true') {
-            console.warn('post_detail.js: Like button handler already attached, removing and reattaching');
-            // Clone button to remove all existing listeners
-            const newLikeBtn = likeBtn.cloneNode(true);
-            likeBtn.parentNode.replaceChild(newLikeBtn, likeBtn);
-            // Use the new button
-            buttonToUse = document.getElementById(`like-btn-${postId}`);
-            if (!buttonToUse) {
-                console.error('post_detail.js: Failed to get like button after cloning');
-                return;
-            }
-        }
-        buttonToUse.dataset.handlerAttached = 'true';
-
-        let isProcessing = false;
-
-        buttonToUse.addEventListener('click', async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Prevent double-click
-            if (isProcessing) {
-                console.log('post_detail.js: Like request already in progress, ignoring click');
-                return;
-            }
-
-            console.log('post_detail.js: Like button clicked for post', postId);
-            isProcessing = true;
-
-            const likesSpan = document.getElementById(`likes-count-${postId}`);
-
-            try {
-                const data = await toggleLike(postId, buttonToUse, likesSpan);
-                console.log('post_detail.js: Like response:', data);
-            } catch (error) {
-                console.error('post_detail.js: Error liking post:', error);
-            } finally {
-                isProcessing = false;
-                console.log('post_detail.js: Like request completed');
-            }
-        }, { once: false, passive: false });
+        console.log('post_detail.js: Like buttons handled by event delegation');
     }
 
     // =========================================================================
