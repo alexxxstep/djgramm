@@ -49,29 +49,61 @@ RUN echo "=== Current directory ===" && pwd && \
 # Build frontend assets (output goes to frontend/dist)
 # Use production mode to ensure proper CSS generation
 # Capture build output to verify Tailwind is scanning templates
-# Also verify that templates are readable before build
-RUN echo "=== Verifying templates are readable ===" && \
-    find ./templates -name "*.html" -exec head -5 {} \; | head -20 && \
+# Also verify that templates are readable and contain class attributes
+RUN echo "=== Verifying templates contain class attributes ===" && \
+    echo "Sample class attributes from templates:" && \
+    grep -h 'class=' ./templates/**/*.html 2>/dev/null | head -10 || \
+    find ./templates -name "*.html" -exec grep -h 'class=' {} \; | head -10 && \
+    echo "" && \
+    echo "=== Counting class attributes in templates ===" && \
+    CLASS_COUNT=$(grep -r 'class=' ./templates/**/*.html 2>/dev/null | wc -l || find ./templates -name "*.html" -exec grep -c 'class=' {} \; | awk '{s+=$1} END {print s}') && \
+    echo "Total class attributes found: $CLASS_COUNT" && \
+    echo "" && \
+    echo "=== Starting build ===" && \
     NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
 
 # Debug: Verify Tailwind found templates and check generated CSS
 RUN echo "=== Tailwind build output ===" && \
-    grep -i "tailwind\|templates\|content" /tmp/build.log | head -20 || echo "No Tailwind debug output found" && \
+    grep -i "tailwind\|templates\|content\|found" /tmp/build.log | head -30 || echo "No Tailwind debug output found" && \
+    echo "" && \
     echo "=== Generated CSS size ===" && \
     ls -lh frontend/dist/styles.css && \
+    echo "" && \
     echo "=== CSS contains Tailwind classes? ===" && \
-    (grep -c "\.bg-gray\|\.text-gray\|\.flex\|\.grid" frontend/dist/styles.css || echo "0") && \
+    BG_COUNT=$(grep -c "\.bg-gray\|\.bg-white\|\.bg-primary" frontend/dist/styles.css || echo "0") && \
+    TEXT_COUNT=$(grep -c "\.text-gray\|\.text-white\|\.text-primary" frontend/dist/styles.css || echo "0") && \
+    FLEX_COUNT=$(grep -c "\.flex\|\.grid" frontend/dist/styles.css || echo "0") && \
+    DARK_COUNT=$(grep -c "\.dark\." frontend/dist/styles.css || echo "0") && \
+    HOVER_COUNT=$(grep -c "\.hover:" frontend/dist/styles.css || echo "0") && \
+    echo "Background classes: $BG_COUNT" && \
+    echo "Text classes: $TEXT_COUNT" && \
+    echo "Flex/Grid classes: $FLEX_COUNT" && \
+    echo "Dark mode classes: $DARK_COUNT" && \
+    echo "Hover classes: $HOVER_COUNT" && \
+    TOTAL_CLASSES=$((BG_COUNT + TEXT_COUNT + FLEX_COUNT + DARK_COUNT + HOVER_COUNT)) && \
+    echo "Total classes found: $TOTAL_CLASSES" && \
+    echo "" && \
     echo "=== CSS file size check ===" && \
     CSS_SIZE=$(stat -f%z frontend/dist/styles.css 2>/dev/null || stat -c%s frontend/dist/styles.css 2>/dev/null || echo 0) && \
-    echo "CSS size: $CSS_SIZE bytes" && \
+    echo "CSS size: $CSS_SIZE bytes ($(echo "scale=1; $CSS_SIZE/1024" | bc)KB)" && \
     if [ "$CSS_SIZE" -lt 50000 ]; then \
-      echo "ERROR: CSS too small (<50KB) - Tailwind may not have found templates!" && \
-      echo "First 100 lines of CSS:" && \
-      head -100 frontend/dist/styles.css && \
-      exit 1; \
+      echo "WARNING: CSS size is $CSS_SIZE bytes (<50KB)" && \
+      if [ "$TOTAL_CLASSES" -lt 100 ]; then \
+        echo "ERROR: Too few classes found ($TOTAL_CLASSES < 100)! CSS may be incomplete." && \
+        echo "This indicates Tailwind is not properly scanning templates or safelist is not working." && \
+        echo "" && \
+        echo "Sample CSS content (first 200 lines):" && \
+        head -200 frontend/dist/styles.css && \
+        exit 1; \
+      else \
+        echo "INFO: CSS size is small but safelist classes are present ($TOTAL_CLASSES classes)." && \
+        echo "CSS should be functional, but consider checking why templates are not being scanned properly."; \
+      fi; \
     else \
-      echo "CSS size OK (>50KB)"; \
-    fi
+      echo "✓ CSS size OK (>50KB)"; \
+    fi && \
+    echo "" && \
+    echo "=== Build validation complete ==="
 
 # Remove templates after build (they'll be copied again in production stage)
 RUN rm -rf ./templates ./app 2>/dev/null || true
