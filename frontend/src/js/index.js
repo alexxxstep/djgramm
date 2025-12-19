@@ -7,6 +7,12 @@ import '../css/main.css';
 // Import theme first (must be loaded immediately)
 import './theme.js';
 
+// Import like handler for event delegation (must be loaded immediately)
+import './modules/likes/likeHandler.js';
+
+// Import follow handler for event delegation (must be loaded immediately)
+import './follow.js';
+
 // Export utilities for potential use in other modules
 export { getCsrfToken } from './utils/csrf.js';
 export { ajaxGet, ajaxPost, ajaxWithLoading } from './utils/ajax.js';
@@ -29,10 +35,9 @@ function loadPageModules() {
         console.error('Failed to load feed module:', err);
       });
 
+    // Follow buttons are handled by event delegation in follow.js
+    // Import to ensure module is loaded
     import(/* webpackChunkName: "follow" */ './follow.js')
-      .then(module => {
-        if (module.initFollow) module.initFollow();
-      })
       .catch(err => {
         console.error('Failed to load follow module:', err);
       });
