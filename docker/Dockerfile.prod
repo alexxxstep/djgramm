@@ -29,20 +29,46 @@ RUN mkdir -p ./app/templatetags
 COPY src/app/templatetags/ ./app/templatetags/
 
 # Debug: List templates to verify they're copied
-RUN echo "=== Templates found ===" && find ./templates -name "*.html" | head -10 || true && \
-    echo "=== Templatetags found ===" && find ./app/templatetags -name "*.py" 2>/dev/null | head -5 || echo "No templatetags found" && \
-    echo "=== Current directory ===" && pwd && \
+# This is critical - Tailwind needs these templates to generate CSS
+RUN echo "=== Current directory ===" && pwd && \
     echo "=== Directory structure ===" && ls -la && \
-    echo "=== Templates directory ===" && ls -la ./templates/ 2>/dev/null || echo "Templates dir not found"
+    echo "=== Templates directory ===" && \
+    if [ -d "./templates" ]; then \
+      ls -la ./templates/ && \
+      echo "=== Templates found ===" && \
+      find ./templates -name "*.html" | head -20 && \
+      TEMPLATE_COUNT=$(find ./templates -name "*.html" | wc -l) && \
+      echo "Total templates: $TEMPLATE_COUNT"; \
+    else \
+      echo "ERROR: Templates directory not found!" && \
+      exit 1; \
+    fi && \
+    echo "=== Templatetags found ===" && \
+    (find ./app/templatetags -name "*.py" 2>/dev/null | head -5 || echo "No templatetags found (optional)")
 
 # Build frontend assets (output goes to frontend/dist)
 # Use production mode to ensure proper CSS generation
-RUN NODE_ENV=production npm run build
+# Capture build output to verify Tailwind is scanning templates
+RUN NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
 
-# Debug: Check generated CSS size and content
-RUN echo "=== Generated CSS size ===" && ls -lh frontend/dist/styles.css && \
-    echo "=== CSS first 50 lines ===" && head -50 frontend/dist/styles.css && \
-    echo "=== CSS contains Tailwind classes? ===" && grep -c "\.bg-gray\|\.text-gray\|\.flex\|\.grid" frontend/dist/styles.css || echo "No Tailwind classes found"
+# Debug: Verify Tailwind found templates and check generated CSS
+RUN echo "=== Tailwind build output ===" && \
+    grep -i "tailwind\|templates\|content" /tmp/build.log | head -20 || echo "No Tailwind debug output found" && \
+    echo "=== Generated CSS size ===" && \
+    ls -lh frontend/dist/styles.css && \
+    echo "=== CSS contains Tailwind classes? ===" && \
+    (grep -c "\.bg-gray\|\.text-gray\|\.flex\|\.grid" frontend/dist/styles.css || echo "0") && \
+    echo "=== CSS file size check ===" && \
+    CSS_SIZE=$(stat -f%z frontend/dist/styles.css 2>/dev/null || stat -c%s frontend/dist/styles.css 2>/dev/null || echo 0) && \
+    echo "CSS size: $CSS_SIZE bytes" && \
+    if [ "$CSS_SIZE" -lt 50000 ]; then \
+      echo "ERROR: CSS too small (<50KB) - Tailwind may not have found templates!" && \
+      echo "First 100 lines of CSS:" && \
+      head -100 frontend/dist/styles.css && \
+      exit 1; \
+    else \
+      echo "CSS size OK (>50KB)"; \
+    fi
 
 # Remove templates after build (they'll be copied again in production stage)
 RUN rm -rf ./templates ./app 2>/dev/null || true
@@ -101,7 +127,28 @@ RUN mkdir -p staticfiles media \
 
 # Collect static files
 # Set DEBUG=0 to avoid importing debug_toolbar (not installed in production)
-RUN SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput
+# Verify frontend/dist exists before collectstatic
+RUN echo "=== Verifying frontend/dist before collectstatic ===" && \
+    ls -lh /app/frontend/dist/ && \
+    echo "=== Frontend dist files ===" && \
+    ls -lh /app/frontend/dist/*.css /app/frontend/dist/*.js 2>/dev/null || echo "No CSS/JS files found" && \
+    SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput && \
+    echo "=== After collectstatic ===" && \
+    ls -lh /app/staticfiles/ | head -20 && \
+    echo "=== Verifying styles.css was copied ===" && \
+    if [ -f "/app/staticfiles/styles.css" ]; then \
+      CSS_SIZE=$(stat -f%z /app/staticfiles/styles.css 2>/dev/null || stat -c%s /app/staticfiles/styles.css 2>/dev/null || echo 0) && \
+      echo "styles.css size: $CSS_SIZE bytes" && \
+      if [ "$CSS_SIZE" -lt 50000 ]; then \
+        echo "ERROR: styles.css in staticfiles is too small!" && \
+        exit 1; \
+      else \
+        echo "styles.css size OK"; \
+      fi; \
+    else \
+      echo "ERROR: styles.css not found in staticfiles!" && \
+      exit 1; \
+    fi
 
 # Switch to non-root user
 USER appuser

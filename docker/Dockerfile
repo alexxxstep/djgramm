@@ -41,8 +41,21 @@ COPY webpack.config.js tailwind.config.js postcss.config.js ./
 # Templates are copied temporarily just for the build
 COPY src/templates/ ./templates/
 
+# Verify templates are copied (same as production)
+RUN echo "=== Templates found ===" && \
+    find ./templates -name "*.html" | head -10 || (echo "ERROR: No templates found!" && exit 1)
+
 # Build frontend assets
 RUN npm run build
+
+# Verify CSS was generated correctly
+RUN if [ -f "frontend/dist/styles.css" ]; then \
+      CSS_SIZE=$(stat -f%z frontend/dist/styles.css 2>/dev/null || stat -c%s frontend/dist/styles.css 2>/dev/null || echo 0) && \
+      echo "CSS size: $CSS_SIZE bytes" && \
+      if [ "$CSS_SIZE" -lt 50000 ]; then \
+        echo "WARNING: CSS too small (<50KB)"; \
+      fi; \
+    fi
 
 # Remove templates after build (they'll be copied again with src/)
 RUN rm -rf ./templates
