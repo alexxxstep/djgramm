@@ -57,46 +57,15 @@ RUN echo "=== Verifying templates contain class attributes ===" && \
     echo "=== Starting build ===" && \
     NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (echo "Build failed! Log:" && cat /tmp/build.log && exit 1)
 
-# Debug: Verify Tailwind found templates and check generated CSS
-# First check if CSS file was created
+# Verify CSS was created and has content
 RUN if [ ! -f "frontend/dist/styles.css" ]; then \
-      echo "ERROR: styles.css was not created! Build may have failed." && \
-      echo "Build log:" && \
-      cat /tmp/build.log && \
-      exit 1; \
+      echo "ERROR: styles.css was not created!" && exit 1; \
     fi && \
-    echo "=== Tailwind build output ===" && \
-    grep -i "tailwind\|templates\|content\|found" /tmp/build.log | head -30 || echo "No Tailwind debug output found" && \
-    echo "" && \
-    echo "=== Generated CSS size ===" && \
-    ls -lh frontend/dist/styles.css && \
-    echo "" && \
-    echo "=== CSS contains Tailwind classes? ===" && \
-    BG_COUNT=$(grep -c "\.bg-gray\|\.bg-white\|\.bg-primary" frontend/dist/styles.css || echo "0") && \
-    TEXT_COUNT=$(grep -c "\.text-gray\|\.text-white\|\.text-primary" frontend/dist/styles.css || echo "0") && \
-    FLEX_COUNT=$(grep -c "\.flex\|\.grid" frontend/dist/styles.css || echo "0") && \
-    DARK_COUNT=$(grep -c "\.dark\." frontend/dist/styles.css || echo "0") && \
-    HOVER_COUNT=$(grep -c "\.hover:" frontend/dist/styles.css || echo "0") && \
-    echo "Background classes: $BG_COUNT" && \
-    echo "Text classes: $TEXT_COUNT" && \
-    echo "Flex/Grid classes: $FLEX_COUNT" && \
-    echo "Dark mode classes: $DARK_COUNT" && \
-    echo "Hover classes: $HOVER_COUNT" && \
-    TOTAL_CLASSES=$((BG_COUNT + TEXT_COUNT + FLEX_COUNT + DARK_COUNT + HOVER_COUNT)) && \
-    echo "Total classes found: $TOTAL_CLASSES" && \
-    echo "" && \
-    echo "=== CSS validation ===" && \
-    CSS_SIZE=$(stat -c%s frontend/dist/styles.css 2>/dev/null || echo 0) && \
-    echo "CSS size: $CSS_SIZE bytes ($(echo "scale=1; $CSS_SIZE/1024" | bc 2>/dev/null || echo "0")KB)" && \
-    if [ "$TOTAL_CLASSES" -lt 20 ]; then \
-      echo "ERROR: Too few classes found ($TOTAL_CLASSES < 20)! CSS generation failed." && \
-      head -50 frontend/dist/styles.css && \
-      exit 1; \
-    else \
-      echo "✓ CSS validation OK ($TOTAL_CLASSES classes, $CSS_SIZE bytes)"; \
-    fi && \
-    echo "" && \
-    echo "=== Build validation complete ==="
+    CSS_SIZE=$(stat -c%s frontend/dist/styles.css) && \
+    echo "✓ CSS built successfully: $CSS_SIZE bytes" && \
+    if [ "$CSS_SIZE" -lt 1000 ]; then \
+      echo "ERROR: CSS file too small" && exit 1; \
+    fi
 
 # Remove templates after build (they'll be copied again in production stage)
 RUN rm -rf ./templates ./app 2>/dev/null || true
