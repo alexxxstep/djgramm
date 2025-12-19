@@ -109,20 +109,37 @@
   }
 
   /**
+   * Attach click handler to theme toggle button
+   */
+  function attachThemeButton() {
+    const button = document.getElementById('theme-toggle');
+    if (button) {
+      // Remove existing listener if any
+      const newButton = button.cloneNode(true);
+      button.parentNode.replaceChild(newButton, button);
+      newButton.addEventListener('click', toggleTheme);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Initialize theme switcher
    */
   function init() {
     // Wait for DOM to be ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initTheme);
+      document.addEventListener('DOMContentLoaded', () => {
+        initTheme();
+        attachThemeButton();
+      });
     } else {
       initTheme();
-    }
-
-    // Attach click handler to theme toggle button
-    const button = document.getElementById('theme-toggle');
-    if (button) {
-      button.addEventListener('click', toggleTheme);
+      // Try to attach button immediately
+      if (!attachThemeButton()) {
+        // If button not found, try again after a short delay
+        setTimeout(attachThemeButton, 100);
+      }
     }
   }
 

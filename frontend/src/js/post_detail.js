@@ -60,26 +60,24 @@ export function initPostDetail() {
         console.log('post_detail.js: Like button found for post', postId);
 
         // Check if handler already attached (possibly by feed.js)
+        let buttonToUse = likeBtn;
         if (likeBtn.dataset.handlerAttached === 'true') {
             console.warn('post_detail.js: Like button handler already attached, removing and reattaching');
             // Clone button to remove all existing listeners
             const newLikeBtn = likeBtn.cloneNode(true);
             likeBtn.parentNode.replaceChild(newLikeBtn, likeBtn);
             // Use the new button
-            const buttonToUse = document.getElementById(`like-btn-${postId}`);
+            buttonToUse = document.getElementById(`like-btn-${postId}`);
             if (!buttonToUse) {
                 console.error('post_detail.js: Failed to get like button after cloning');
                 return;
             }
-            buttonToUse.dataset.handlerAttached = 'true';
-            likeBtn = buttonToUse;
-        } else {
-            likeBtn.dataset.handlerAttached = 'true';
         }
+        buttonToUse.dataset.handlerAttached = 'true';
 
         let isProcessing = false;
 
-        likeBtn.addEventListener('click', async function(e) {
+        buttonToUse.addEventListener('click', async function(e) {
             e.preventDefault();
             e.stopPropagation();
 
@@ -95,7 +93,7 @@ export function initPostDetail() {
             const likesSpan = document.getElementById(`likes-count-${postId}`);
 
             try {
-                const data = await toggleLike(postId, likeBtn, likesSpan);
+                const data = await toggleLike(postId, buttonToUse, likesSpan);
                 console.log('post_detail.js: Like response:', data);
             } catch (error) {
                 console.error('post_detail.js: Error liking post:', error);
