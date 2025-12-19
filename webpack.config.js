@@ -18,8 +18,10 @@ module.exports = {
 
   output: {
     path: path.resolve(__dirname, 'frontend/dist'),
-    filename: isProduction ? '[name].[contenthash:8].js' : '[name].js',
-    chunkFilename: isProduction ? '[name].[contenthash:8].chunk.js' : '[name].chunk.js',
+    // Use static filename for Django static files compatibility
+    // Hash is not needed since we use collectstatic which handles versioning
+    filename: '[name].js',
+    chunkFilename: '[name].chunk.js',
     clean: true, // Clean output directory before each build
   },
 
