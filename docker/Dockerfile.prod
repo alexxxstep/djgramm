@@ -132,12 +132,21 @@ RUN echo "=== Verifying frontend/dist before collectstatic ===" && \
     SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput && \
     echo "=== After collectstatic ===" && \
     ls -lh /app/staticfiles/ | head -20 && \
-    echo "=== Verifying styles.css was copied ===" && \
+    echo "=== Verifying static files were copied ===" && \
     if [ -f "/app/staticfiles/styles.css" ]; then \
       CSS_SIZE=$(stat -c%s /app/staticfiles/styles.css 2>/dev/null || echo 0) && \
       echo "✓ styles.css copied ($CSS_SIZE bytes)"; \
     else \
       echo "ERROR: styles.css not found in staticfiles!" && \
+      exit 1; \
+    fi && \
+    if [ -f "/app/staticfiles/main.js" ]; then \
+      JS_SIZE=$(stat -c%s /app/staticfiles/main.js 2>/dev/null || echo 0) && \
+      echo "✓ main.js copied ($JS_SIZE bytes)"; \
+    else \
+      echo "ERROR: main.js not found in staticfiles!" && \
+      echo "Available files in staticfiles:" && \
+      ls -la /app/staticfiles/ | head -20 && \
       exit 1; \
     fi
 
