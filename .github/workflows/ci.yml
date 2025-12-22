@@ -64,9 +64,6 @@ jobs:
       - name: Create virtual environment
         run: uv venv
 
-      - name: Activate virtual environment
-        run: source .venv/bin/activate
-
       - name: Install dependencies
         run: uv sync --frozen
 
@@ -122,15 +119,15 @@ jobs:
       - name: Create virtual environment
         run: uv venv
 
-      - name: Activate virtual environment
-        run: source .venv/bin/activate
-
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Run migrations
+        run: uv run python src/manage.py migrate --noinput
+
       - name: Run pytest with coverage
         run: |
-          uv run pytest tests/ --cov=src/app --cov-report=term-missing --cov-report=xml
+          uv run pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml -v
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -189,23 +186,20 @@ jobs:
       - name: Create virtual environment
         run: uv venv
 
-      - name: Activate virtual environment
-        run: source .venv/bin/activate
-
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Run migrations
+        run: uv run python src/manage.py migrate --noinput
+
       - name: Run Django check
-        run: |
-          uv run python src/manage.py check --deploy
+        run: uv run python src/manage.py check --deploy
 
       - name: Check migrations
-        run: |
-          uv run python src/manage.py makemigrations --check --dry-run
+        run: uv run python src/manage.py makemigrations --check --dry-run
 
       - name: Test Cloudinary configuration
-        run: |
-          uv run python src/manage.py shell -c "from django.conf import settings; assert hasattr(settings, 'CLOUDINARY_STORAGE')"
+        run: uv run python src/manage.py shell -c "from django.conf import settings; assert hasattr(settings, 'CLOUDINARY_STORAGE')"
 
   # =============================================================================
   # BUILD STAGE

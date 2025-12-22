@@ -25,9 +25,17 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(
+# ALLOWED_HOSTS - ensure localhost and 127.0.0.1 are always included for health checks
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(
     ","
 )
+# Strip whitespace and ensure localhost and 127.0.0.1 are always included
+_allowed_hosts = [h.strip() for h in _allowed_hosts if h.strip()]
+if "localhost" not in _allowed_hosts:
+    _allowed_hosts.append("localhost")
+if "127.0.0.1" not in _allowed_hosts:
+    _allowed_hosts.append("127.0.0.1")
+ALLOWED_HOSTS = _allowed_hosts
 
 # Application definition
 INSTALLED_APPS = [
@@ -45,8 +53,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "app.middleware.HealthCheckMiddleware",  # Must be BEFORE SecurityMiddleware
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # WhiteNoise middleware - only in DEBUG mode (nginx serves static files in production)
+    *(["whitenoise.middleware.WhiteNoiseMiddleware"] if DEBUG else []),
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -96,6 +106,17 @@ if DEBUG:
 WHITENOISE_USE_FINDERS = (
     True  # Allow WhiteNoise to serve static files in DEBUG mode
 )
+
+# WhiteNoise cache settings for static files
+WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+
+
+def whitenoise_immutable_file_test(path, url):
+    """Test if a file should be cached as immutable."""
+    return url.startswith("/static/dist/")
+
+
+WHITENOISE_IMMUTABLE_FILE_TEST = whitenoise_immutable_file_test
 
 ROOT_URLCONF = "config.urls"
 
@@ -181,14 +202,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+# Frontend built files are in frontend/dist
+# In Docker: BASE_DIR = /app, frontend is at /app/frontend/dist
+# On host: BASE_DIR = src/, frontend is at project root/frontend/dist
+frontend_dist = BASE_DIR / "frontend" / "dist"
+# Fallback to parent path if not found (host development case)
+if not frontend_dist.exists():
+    frontend_dist = BASE_DIR.parent / "frontend" / "dist"
+# Only add to STATICFILES_DIRS if it exists
+STATICFILES_DIRS = [frontend_dist] if frontend_dist.exists() else []
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise configuration (only in production)
-if not DEBUG:
-    STATICFILES_STORAGE = (
-        "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    )
+# WhiteNoise configuration
+# Disabled when nginx serves static files (production with nginx)
+# Enable only if Django serves static files directly (without nginx)
+# if not DEBUG:
+#     STATICFILES_STORAGE = (
+#         "whitenoise.storage.CompressedManifestStaticFilesStorage"
+#     )
 
 # =============================================================================
 # Media files

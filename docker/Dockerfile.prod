@@ -2,7 +2,76 @@
 # Multi-stage build for smaller image size
 
 # =============================================================================
-# Stage 1: Build
+# Stage 1: Frontend Build (Node.js)
+# =============================================================================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies (including dev dependencies for build)
+# We need dev dependencies for webpack, tailwind, postcss, etc.
+RUN npm ci || npm install
+
+# Copy frontend source
+COPY frontend/ ./frontend/
+COPY webpack.config.js tailwind.config.js postcss.config.js ./
+
+# Copy templates for Tailwind CSS to scan (needed for content paths)
+# Templates are copied temporarily just for the build, then removed
+COPY src/templates/ ./templates/
+
+# Copy templatetags for Tailwind CSS content scanning
+# Create directory structure first
+RUN mkdir -p ./app/templatetags
+COPY src/app/templatetags/ ./app/templatetags/
+
+# Debug: List templates to verify they're copied
+# This is critical - Tailwind needs these templates to generate CSS
+RUN echo "=== Current directory ===" && pwd && \
+    echo "=== Directory structure ===" && ls -la && \
+    echo "=== Templates directory ===" && \
+    if [ -d "./templates" ]; then \
+      ls -la ./templates/ && \
+      echo "=== Templates found ===" && \
+      find ./templates -name "*.html" | head -20 && \
+      TEMPLATE_COUNT=$(find ./templates -name "*.html" | wc -l) && \
+      echo "Total templates: $TEMPLATE_COUNT"; \
+    else \
+      echo "ERROR: Templates directory not found!" && \
+      exit 1; \
+    fi && \
+    echo "=== Templatetags found ===" && \
+    (find ./app/templatetags -name "*.py" 2>/dev/null | head -5 || echo "No templatetags found (optional)")
+
+# Build frontend assets (output goes to frontend/dist)
+# Use production mode to ensure proper CSS generation
+# Capture build output to verify Tailwind is scanning templates
+RUN echo "=== Verifying templates contain class attributes ===" && \
+    echo "Sample class attributes from templates:" && \
+    (grep -h 'class=' ./templates/**/*.html 2>/dev/null | head -10 || \
+     find ./templates -name "*.html" -exec grep -h 'class=' {} \; | head -10) && \
+    echo "" && \
+    echo "=== Starting build ===" && \
+    NODE_ENV=production npm run build 2>&1 | tee /tmp/build.log || (echo "Build failed! Log:" && cat /tmp/build.log && exit 1)
+
+# Verify CSS was created and has content
+RUN if [ ! -f "frontend/dist/styles.css" ]; then \
+      echo "ERROR: styles.css was not created!" && exit 1; \
+    fi && \
+    CSS_SIZE=$(stat -c%s frontend/dist/styles.css) && \
+    echo "✓ CSS built successfully: $CSS_SIZE bytes" && \
+    if [ "$CSS_SIZE" -lt 1000 ]; then \
+      echo "ERROR: CSS file too small" && exit 1; \
+    fi
+
+# Remove templates after build (they'll be copied again in production stage)
+RUN rm -rf ./templates ./app 2>/dev/null || true
+
+# =============================================================================
+# Stage 2: Python Build
 # =============================================================================
 FROM python:3.12-slim AS builder
 
@@ -43,6 +112,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
+# Copy frontend build artifacts (from frontend/dist)
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+
 # Copy source code
 COPY src/ .
 
@@ -52,7 +124,31 @@ RUN mkdir -p staticfiles media \
 
 # Collect static files
 # Set DEBUG=0 to avoid importing debug_toolbar (not installed in production)
-RUN SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput
+# Verify frontend/dist exists before collectstatic
+RUN echo "=== Verifying frontend/dist before collectstatic ===" && \
+    ls -lh /app/frontend/dist/ && \
+    echo "=== Frontend dist files ===" && \
+    ls -lh /app/frontend/dist/*.css /app/frontend/dist/*.js 2>/dev/null || echo "No CSS/JS files found" && \
+    SECRET_KEY=build-key DEBUG=0 python manage.py collectstatic --noinput && \
+    echo "=== After collectstatic ===" && \
+    ls -lh /app/staticfiles/ | head -20 && \
+    echo "=== Verifying static files were copied ===" && \
+    if [ -f "/app/staticfiles/styles.css" ]; then \
+      CSS_SIZE=$(stat -c%s /app/staticfiles/styles.css 2>/dev/null || echo 0) && \
+      echo "✓ styles.css copied ($CSS_SIZE bytes)"; \
+    else \
+      echo "ERROR: styles.css not found in staticfiles!" && \
+      exit 1; \
+    fi && \
+    if [ -f "/app/staticfiles/main.js" ]; then \
+      JS_SIZE=$(stat -c%s /app/staticfiles/main.js 2>/dev/null || echo 0) && \
+      echo "✓ main.js copied ($JS_SIZE bytes)"; \
+    else \
+      echo "ERROR: main.js not found in staticfiles!" && \
+      echo "Available files in staticfiles:" && \
+      ls -la /app/staticfiles/ | head -20 && \
+      exit 1; \
+    fi
 
 # Switch to non-root user
 USER appuser
@@ -61,8 +157,9 @@ USER appuser
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/')" || exit 1
+# Middleware handles redirects and returns 200 OK for /health/
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; opener = urllib.request.build_opener(); opener.addheaders = [('Host', '127.0.0.1')]; req = urllib.request.Request('http://127.0.0.1:8000/health/'); response = opener.open(req, timeout=5); assert response.status in (200, 301, 302), f'Status: {response.status}'" || exit 1
 
 # Run with gunicorn
 CMD ["gunicorn", "config.wsgi:application", \

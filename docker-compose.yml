@@ -22,8 +22,15 @@ services:
     command: uv run python manage.py runserver 0.0.0.0:9000
     volumes:
       - ./src:/app
+      - ./tests:/app/tests
       - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./frontend:/app/frontend
+      - ./package.json:/app/package.json:ro
+      - ./webpack.config.js:/app/webpack.config.js:ro
+      - ./tailwind.config.js:/app/tailwind.config.js:ro
+      - ./postcss.config.js:/app/postcss.config.js:ro
       - venv_data:/app/.venv
+      - node_modules_data:/app/node_modules
       - static_data:/app/staticfiles
       - media_data:/app/media
     ports:
@@ -43,5 +50,6 @@ services:
 volumes:
   postgres_data:
   venv_data:
+  node_modules_data:
   static_data:
   media_data:
