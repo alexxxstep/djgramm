@@ -62,7 +62,7 @@ class LikeAdmin(admin.ModelAdmin):
 class CommentAdmin(admin.ModelAdmin):
     """Admin for Comment model."""
 
-    list_display = ["author", "post", "created_at"]
+    list_display = ["author", "post", "created_at", "text"]
     list_filter = ["created_at"]
     search_fields = ["text", "author__email", "author__username"]
     ordering = ["created_at"]

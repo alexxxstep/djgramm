@@ -81,4 +81,10 @@ urlpatterns = [
     ),
     # Tags
     path("tag/<slug:slug>/", views.TagPostsView.as_view(), name="tag_posts"),
+    # OAuth
+    path(
+        "oauth/disconnect/<str:provider>/",
+        views.disconnect_oauth,
+        name="disconnect_oauth",
+    ),
 ]

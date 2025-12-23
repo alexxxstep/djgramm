@@ -170,7 +170,13 @@ class RegisterView(CreateView):
     def form_valid(self, form):
         """Log in user after registration."""
         user = form.save()
-        login(self.request, user)
+        # Specify backend for login when multiple backends are configured
+        # Backend must be a dotted import path string
+        login(
+            self.request,
+            user,
+            backend="django.contrib.auth.backends.ModelBackend",
+        )
         messages.success(self.request, f"Welcome, {user.username}!")
         return redirect(self.success_url)
 
@@ -324,6 +330,19 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
     def get_object(self, queryset=None):
         """Get current user's profile."""
         return self.request.user.profile
+
+    def get_context_data(self, **kwargs):
+        """Add connected OAuth providers to context."""
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        # Get connected providers
+        connected_providers = set(
+            user.social_auth.values_list("provider", flat=True)
+        )
+        context["connected_providers"] = connected_providers
+
+        return context
 
     def get_success_url(self):
         """Redirect to user profile after edit."""
@@ -797,3 +816,64 @@ class TagPostsView(ListView):
         context = super().get_context_data(**kwargs)
         context["tag"] = self.tag
         return context
+
+
+# =============================================================================
+# OAuth
+# =============================================================================
+
+
+@login_required
+def disconnect_oauth(request, provider):
+    """Safely disconnect OAuth provider with validation."""
+    from django.contrib import messages
+    from django.contrib.auth import get_user_model
+    from django.shortcuts import redirect
+    from social_django.models import UserSocialAuth
+
+    # Reload user from DB to get latest password state
+    User = get_user_model()
+    user = User.objects.get(pk=request.user.pk)
+
+    # Provider display names
+    provider_names = {
+        "github": "GitHub",
+        "google-oauth2": "Google",
+    }
+    provider_name = provider_names.get(provider, provider.title())
+
+    # Check if provider is connected
+    try:
+        social_auth = UserSocialAuth.objects.get(user=user, provider=provider)
+    except UserSocialAuth.DoesNotExist:
+        messages.error(
+            request, f"{provider_name} is not connected to your account."
+        )
+        return redirect("profile_edit")
+
+    # Count available authentication methods
+    oauth_count = user.social_auth.count()
+
+    # Check password: reload user to get latest password state
+    # In test environment, ensure we get the latest committed state
+    # Force fresh database query
+    user = User.objects.get(pk=user.pk)
+    # Check password directly: usable password doesn't start with '!'
+    # Also check if password field exists and is not empty
+    has_password = bool(user.password) and not user.password.startswith("!")
+
+    # If user has password set (not unusable), allow disconnect
+    # Only prevent if it's the ONLY auth method AND no password
+    if oauth_count == 1 and not has_password:
+        messages.error(
+            request,
+            "Cannot disconnect. Set a password first or connect another account.",
+        )
+        return redirect("profile_edit")
+
+    # Disconnect the provider
+    social_auth.delete()
+    messages.success(
+        request, f"{provider_name} has been disconnected successfully."
+    )
+    return redirect("profile_edit")

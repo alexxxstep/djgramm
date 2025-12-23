@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     # Cloudinary
     "cloudinary",
     "cloudinary_storage",
+    # Social Auth
+    "social_django",
     # Local apps
     "app.apps.DjgrammAppConfig",
 ]
@@ -131,6 +133,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "social_django.context_processors.backends",
+                "social_django.context_processors.login_redirect",
                 "app.context_processors.unread_news_count",
             ],
         },
@@ -165,6 +169,61 @@ else:
 
 # Custom user model
 AUTH_USER_MODEL = "app.User"
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = (
+    "social_core.backends.github.GithubOAuth2",
+    "social_core.backends.google.GoogleOAuth2",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
+# Social Auth settings
+SOCIAL_AUTH_USER_MODEL = "app.User"
+
+# OAuth redirect URLs
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/"
+SOCIAL_AUTH_LOGIN_ERROR_URL = "/login/?error=oauth"
+SOCIAL_AUTH_NEW_USER_REDIRECT_URL = "/"
+SOCIAL_AUTH_NEW_ASSOCIATION_REDIRECT_URL = "/"
+
+# GitHub OAuth settings
+SOCIAL_AUTH_GITHUB_KEY = os.environ.get("SOCIAL_AUTH_GITHUB_KEY")
+SOCIAL_AUTH_GITHUB_SECRET = os.environ.get("SOCIAL_AUTH_GITHUB_SECRET")
+SOCIAL_AUTH_GITHUB_SCOPE = ["user:email", "read:user"]
+
+# Google OAuth settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get(
+    "SOCIAL_AUTH_GOOGLE_OAUTH2_KEY", ""
+)
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get(
+    "SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET", ""
+)
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+]
+
+# Pipeline settings (customized)
+SOCIAL_AUTH_PIPELINE = (
+    "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_uid",
+    "social_core.pipeline.social_auth.auth_allowed",
+    "social_core.pipeline.social_auth.social_user",
+    "app.pipeline.associate_by_email",  # Custom: associate by email
+    "app.pipeline.get_username",  # Custom: handle username conflicts
+    "social_core.pipeline.user.create_user",
+    "social_core.pipeline.social_auth.associate_user",
+    "social_core.pipeline.social_auth.load_extra_data",
+    "social_core.pipeline.user.user_details",
+    "app.pipeline.create_profile",  # Custom: ensure Profile exists
+    "app.pipeline.save_avatar",  # Custom: save avatar from OAuth
+)
+
+# Session security for OAuth
+SOCIAL_AUTH_SANITIZE_REDIRECTS = True
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = not DEBUG
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -211,6 +270,10 @@ if not frontend_dist.exists():
     frontend_dist = BASE_DIR.parent / "frontend" / "dist"
 # Only add to STATICFILES_DIRS if it exists
 STATICFILES_DIRS = [frontend_dist] if frontend_dist.exists() else []
+# Add static directory for app-level static files (favicon, etc.)
+static_dir = BASE_DIR / "static"
+if static_dir.exists():
+    STATICFILES_DIRS = list(STATICFILES_DIRS) + [static_dir]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # WhiteNoise configuration
