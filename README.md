@@ -159,20 +159,111 @@ Then uncomment HTTPS configuration in `docker/nginx.conf`.
 
 ## Project Structure
 
+### Current Structure (after TASK14)
+
+```
+djgramm/
+├── frontend/                    # ✨ Frontend build system
+│   ├── src/                    # Source files for webpack
+│   │   ├── js/                 # JavaScript modules
+│   │   │   ├── index.js       # Entry point
+│   │   │   ├── feed.js        # Feed functionality
+│   │   │   ├── follow.js      # Follow/unfollow
+│   │   │   ├── post_detail.js # Post detail page
+│   │   │   ├── post_form.js   # Post creation form
+│   │   │   ├── theme.js       # Dark/light theme
+│   │   │   └── utils/         # Shared utilities
+│   │   │       ├── csrf.js    # CSRF token helpers
+│   │   │       ├── ajax.js    # AJAX utilities
+│   │   │       ├── errorHandler.js
+│   │   │       └── eventManager.js
+│   │   └── css/               # CSS source files
+│   │       └── main.css       # Tailwind directives
+│   ├── dist/                   # Built files (gitignored)
+│   │   ├── main.js            # Compiled JavaScript bundle
+│   │   ├── styles.css         # Compiled Tailwind CSS
+│   │   └── *.chunk.js         # Code-split chunks
+│   └── tests/                  # Frontend tests (Jest)
+├── src/
+│   ├── config/                 # Django settings, urls, wsgi
+│   ├── app/                    # Main application
+│   │   ├── management/        # Management commands
+│   │   └── templatetags/      # Custom template tags
+│   ├── templates/             # HTML templates
+│   │   └── base.html          # Base template (uses compiled assets)
+│   └── static/                 # Django static files
+│       └── dist/              # Copied from frontend/dist (via collectstatic)
+├── tests/                       # Pytest tests
+├── docker/                     # Docker configs
+├── scripts/                     # Utility scripts
+├── docs/                        # Documentation
+├── package.json                 # ✨ Node.js dependencies
+├── webpack.config.js            # ✨ Webpack configuration
+├── tailwind.config.js          # ✨ Tailwind CSS configuration
+└── postcss.config.js           # ✨ PostCSS configuration
+```
+
+### Previous Structure (before TASK14)
+
 ```
 djgramm/
 ├── src/
-│   ├── config/          # Django settings, urls, wsgi
-│   ├── app/             # Main application (models, views, forms)
-│   │   ├── management/  # Management commands
-│   │   └── templatetags/ # Custom template tags
-│   ├── templates/       # HTML templates
-│   └── static/          # CSS, JS, images
-├── tests/               # Pytest tests
-├── docker/              # Docker configs
-├── scripts/             # Utility scripts
-└── docs/                # Documentation
+│   ├── config/                 # Django settings, urls, wsgi
+│   ├── app/                    # Main application
+│   │   ├── management/
+│   │   └── templatetags/
+│   ├── templates/              # HTML templates
+│   │   └── base.html          # Used Tailwind CDN
+│   └── static/                 # Static files (uncompiled)
+│       ├── js/                 # Individual JS files
+│       │   ├── main.js
+│       │   ├── follow.js
+│       │   ├── feed.js
+│       │   └── post_detail.js
+│       └── css/
+│           └── style.css
+├── tests/
+├── docker/
+├── scripts/
+└── docs/
 ```
+
+### Key Changes
+
+**New directories:**
+
+- `frontend/` — централізована папка для frontend розробки
+  - `frontend/src/` — вихідні файли (JS, CSS модулі)
+  - `frontend/dist/` — зібрані файли (створюються webpack, gitignored)
+  - `frontend/tests/` — тести для JavaScript модулів
+
+**Reorganized files:**
+
+- JavaScript файли переміщені з `src/static/js/` → `frontend/src/js/`
+- Створено модульну структуру з утилітами (`utils/`)
+- CSS з Tailwind директивами в `frontend/src/css/main.css`
+
+**New configuration files:**
+
+- `package.json` — Node.js залежності та npm скрипти
+- `webpack.config.js` — налаштування збірки з оптимізаціями
+- `tailwind.config.js` — конфігурація Tailwind з content paths
+- `postcss.config.js` — інтеграція Tailwind та Autoprefixer
+
+**Build process:**
+
+```
+frontend/src/  →  webpack  →  frontend/dist/  →  collectstatic  →  src/static/dist/
+(source files)    (build)      (compiled)         (Django)          (served)
+```
+
+**Benefits:**
+
+- ✅ Модульна організація коду (ES6 modules)
+- ✅ Автоматична оптимізація (мініфікація, tree shaking)
+- ✅ Локальна збірка Tailwind (замість CDN)
+- ✅ Code splitting для кращого кешування
+- ✅ Централізовані утиліти (видалено дублювання)
 
 ## Management Commands
 
@@ -219,7 +310,55 @@ After running seed script:
 
 - [Implementation Plan](docs/TASK12_PLAN.md) — детальний план реалізації проекту
 - [UML Schema](docs/UML_SCHEMA.md) — діаграма моделей даних
+- [Frontend Build Plan](docs/TASK14_PLAN.md) — план налаштування webpack та Tailwind CSS
 - [Deployment Guide](.cursor/HETZNER_DEPLOYMENT_QUICK_START.md) — інструкція з деплою на Hetzner
+
+## TASK14 Implementation Summary
+
+**Frontend Build System** — реалізовано повну інтеграцію webpack та Tailwind CSS згідно з [планом](docs/TASK14_PLAN.md).
+
+### Основні зміни:
+
+**Структура проекту:**
+
+- Створено `frontend/` директорію з `src/` (вихідні файли) та `dist/` (зібрані файли)
+- JavaScript модулі переміщені в `frontend/src/js/` з модульною структурою
+- Створено утиліти в `frontend/src/js/utils/` (CSRF, AJAX, error handling, event management)
+- CSS файли в `frontend/src/css/` з Tailwind директивами
+
+**Конфігурація:**
+
+- `package.json` — Node.js залежності та npm скрипти
+- `webpack.config.js` — налаштування збірки з мініфікацією та code splitting
+- `tailwind.config.js` — конфігурація Tailwind з правильними content paths
+- `postcss.config.js` — інтеграція Tailwind та Autoprefixer
+
+**Django інтеграція:**
+
+- Оновлено `src/config/settings.py` — `STATICFILES_DIRS` вказує на `frontend/dist`
+- Оновлено `src/templates/base.html` — замінено Tailwind CDN на локальні зібрані файли
+- Оновлено `.gitignore` — додано `node_modules/`, `frontend/dist/`
+
+**Docker та деплой:**
+
+- Оновлено `docker/Dockerfile.prod` — додано multi-stage build з frontend-builder
+- Автоматична збірка frontend під час створення Docker образу
+- Валідація зібраних файлів перед `collectstatic`
+
+**Оптимізації:**
+
+- Tree shaking для видалення невикористаного коду
+- Мініфікація JavaScript та CSS в production
+- Code splitting для окремих chunk файлів
+- Централізовані утиліти (видалено дублювання CSRF функцій)
+- Event delegation для динамічних елементів
+
+**Тестування:**
+
+- Додано тести для static files (`tests/test_static_files.py`)
+- Перевірка наявності зібраних файлів після збірки
+
+Детальний план реалізації: [docs/TASK14_PLAN.md](docs/TASK14_PLAN.md)
 
 ## License
 
