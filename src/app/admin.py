@@ -23,6 +23,33 @@ class UserAdmin(BaseUserAdmin):
     ordering = ["email"]
     inlines = [ProfileInline]
 
+    def delete_model(self, request, obj):
+        """Handle user deletion with proper cleanup."""
+        try:
+            # Clean up OAuth associations before deletion
+            if hasattr(obj, "social_auth"):
+                obj.social_auth.all().delete()
+        except Exception:
+            # Ignore errors - CASCADE will handle it
+            pass
+
+        # Call parent delete
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        """Handle bulk user deletion with proper cleanup."""
+        for obj in queryset:
+            try:
+                # Clean up OAuth associations before deletion
+                if hasattr(obj, "social_auth"):
+                    obj.social_auth.all().delete()
+            except Exception:
+                # Ignore errors - CASCADE will handle it
+                pass
+
+        # Call parent delete
+        super().delete_queryset(request, queryset)
+
 
 class PostImageInline(admin.TabularInline):
     """Inline for PostImage in Post admin."""

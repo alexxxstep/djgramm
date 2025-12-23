@@ -3,6 +3,10 @@
 
 def get_username(strategy, details, backend, user=None, *args, **kwargs):
     """Generate unique username, handling conflicts."""
+    # If user already exists (from associate_by_email), skip generation
+    if user and user.pk:
+        return {"username": user.username}
+
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
@@ -35,11 +39,17 @@ def associate_by_email(backend, details, response, *args, **kwargs):
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
+        # Try exact match first (case-sensitive)
         try:
             user = User.objects.get(email=email)
             return {"user": user, "is_new": False}
         except User.DoesNotExist:
-            pass
+            # Try case-insensitive match as fallback
+            try:
+                user = User.objects.get(email__iexact=email)
+                return {"user": user, "is_new": False}
+            except User.DoesNotExist:
+                pass
     return None
 
 

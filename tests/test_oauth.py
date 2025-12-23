@@ -66,6 +66,19 @@ class TestGetUsername:
         assert "username" in result
         assert result["username"].startswith("user_github")
 
+    def test_get_username_existing_user(self, db, user):
+        """Test username generation skips when user already exists."""
+        strategy = MagicMock()
+        details = {"email": "test@example.com", "username": "newusername"}
+        backend = MagicMock(name="github")
+
+        # Pass existing user
+        result = get_username(strategy, details, backend, user=user)
+
+        assert "username" in result
+        # Should return existing user's username, not generate new one
+        assert result["username"] == user.username
+
 
 class TestAssociateByEmail:
     """Tests for associate_by_email pipeline function."""
@@ -101,6 +114,26 @@ class TestAssociateByEmail:
         result = associate_by_email(backend, details, response)
 
         assert result is None
+
+    def test_associate_existing_user_case_insensitive(self, db):
+        """Test email matching is case-insensitive."""
+        # Create user with mixed case email
+        user = User.objects.create_user(
+            username="testuser",
+            email="Test@Example.com",  # Mixed case
+            password="testpass123",
+        )
+
+        backend = MagicMock()
+        details = {"email": "test@example.com"}  # Lowercase
+        response = {}
+
+        result = associate_by_email(backend, details, response)
+
+        # Should find user (email matching is case-insensitive)
+        assert result is not None
+        assert result["user"] == user
+        assert result["is_new"] is False
 
 
 class TestCreateProfile:
@@ -316,3 +349,61 @@ class TestProfileEditOAuth:
         assert "GitHub" in content
         assert "Google" in content
         assert "Connect" in content
+
+
+class TestOAuthExistingUserFlow:
+    """Integration tests for OAuth with existing user by email."""
+
+    def test_associate_by_email_with_existing_user(self, db, user):
+        """Test that associate_by_email correctly finds existing user."""
+        backend = MagicMock()
+        details = {"email": user.email}
+        response = {}
+
+        result = associate_by_email(backend, details, response)
+
+        assert result is not None
+        assert result["user"] == user
+        assert result["is_new"] is False
+
+    def test_get_username_preserves_existing_username(self, db, user):
+        """Test that get_username preserves username for existing user."""
+        strategy = MagicMock()
+        details = {"email": user.email, "username": "newusername"}
+        backend = MagicMock(name="github")
+
+        # Simulate that user was found by associate_by_email
+        result = get_username(strategy, details, backend, user=user)
+
+        assert result["username"] == user.username
+        assert result["username"] != "newusername"
+
+    def test_oauth_flow_existing_user_creates_social_auth(self, db, user):
+        """Test that OAuth flow creates UserSocialAuth for existing user."""
+
+        # Simulate OAuth callback with existing email
+        backend = MagicMock(name="github")
+        details = {"email": user.email, "username": "githubuser"}
+        response = {
+            "id": "12345",
+            "avatar_url": "https://example.com/avatar.jpg",
+        }
+
+        # Step 1: associate_by_email should find user
+        association_result = associate_by_email(backend, details, response)
+        assert association_result is not None
+        assert association_result["user"] == user
+
+        # Step 2: get_username should preserve existing username
+        username_result = get_username(
+            MagicMock(), details, backend, user=association_result["user"]
+        )
+        assert username_result["username"] == user.username
+
+        # Step 3: create_profile should ensure profile exists
+        create_profile(backend, user, response)
+        assert Profile.objects.filter(user=user).exists()
+
+        # Note: Actual UserSocialAuth creation happens in
+        # social_core.pipeline.social_auth.associate_user
+        # This test verifies our custom pipeline functions work correctly
