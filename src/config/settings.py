@@ -306,6 +306,7 @@ CLOUDINARY_STORAGE = {
     "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
     "API_KEY": os.environ.get("CLOUDINARY_API_KEY", ""),
     "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET", ""),
+    "SECURE": True,  # Force HTTPS URLs for all Cloudinary resources
 }
 
 # Use Cloudinary for media files (only if credentials are provided)
@@ -319,6 +320,7 @@ if cloud_name and api_key and api_secret:
         cloud_name=cloud_name,
         api_key=api_key,
         api_secret=api_secret,
+        secure=True,  # Force HTTPS URLs for all Cloudinary resources
     )
 else:
     # When Cloudinary credentials are not provided:
