@@ -1,9 +1,14 @@
 """Admin configuration for DJGramm."""
 
+import logging
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.db import transaction
 
 from .models import Comment, Follow, Like, Post, PostImage, Profile, Tag, User
+
+logger = logging.getLogger(__name__)
 
 
 class ProfileInline(admin.StackedInline):
@@ -24,31 +29,45 @@ class UserAdmin(BaseUserAdmin):
     inlines = [ProfileInline]
 
     def delete_model(self, request, obj):
-        """Handle user deletion with proper cleanup."""
-        try:
-            # Clean up OAuth associations before deletion
-            if hasattr(obj, "social_auth"):
-                obj.social_auth.all().delete()
-        except Exception:
-            # Ignore errors - CASCADE will handle it
-            pass
+        """Handle user deletion with proper cleanup in transaction."""
+        logger.info(
+            f"Admin delete_model called for user: {obj.email} (ID: {obj.pk})"
+        )
 
-        # Call parent delete
-        super().delete_model(request, obj)
+        try:
+            with transaction.atomic():
+                # The actual cleanup happens in pre_delete signal
+                # Just call parent delete which will trigger the signal
+                super().delete_model(request, obj)
+                logger.info(f"Successfully deleted user: {obj.email}")
+
+        except Exception as e:
+            logger.error(
+                f"Error deleting user {obj.email}: {e}",
+                exc_info=True,
+            )
+            raise
 
     def delete_queryset(self, request, queryset):
         """Handle bulk user deletion with proper cleanup."""
-        for obj in queryset:
-            try:
-                # Clean up OAuth associations before deletion
-                if hasattr(obj, "social_auth"):
-                    obj.social_auth.all().delete()
-            except Exception:
-                # Ignore errors - CASCADE will handle it
-                pass
+        user_count = queryset.count()
+        logger.info(f"Admin delete_queryset called for {user_count} users")
 
-        # Call parent delete
-        super().delete_queryset(request, queryset)
+        try:
+            with transaction.atomic():
+                # Delete each user individually to trigger pre_delete signals
+                for obj in queryset:
+                    logger.info(f"Deleting user: {obj.email} (ID: {obj.pk})")
+                    obj.delete()
+
+                logger.info(f"Successfully deleted {user_count} users")
+
+        except Exception as e:
+            logger.error(
+                f"Error during bulk user deletion: {e}",
+                exc_info=True,
+            )
+            raise
 
 
 class PostImageInline(admin.TabularInline):

@@ -276,6 +276,14 @@ if static_dir.exists():
     STATICFILES_DIRS = list(STATICFILES_DIRS) + [static_dir]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Exclude Cloudinary static files from collectstatic
+# Cloudinary files are served via CDN and don't need to be collected
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    # Exclude cloudinary_storage finder to avoid permission errors
+]
+
 # WhiteNoise configuration
 # Disabled when nginx serves static files (production with nginx)
 # Enable only if Django serves static files directly (without nginx)
@@ -362,3 +370,44 @@ if not DEBUG and not TESTING:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = "DENY"
+
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {asctime} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "app.signals": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "app.admin": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO" if DEBUG else "WARNING",
+    },
+}
