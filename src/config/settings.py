@@ -361,6 +361,21 @@ if not DEBUG and not TESTING:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+    # CSRF trusted origins (required for HTTPS with custom domain)
+    csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    csrf_origins = [
+        origin.strip() for origin in csrf_origins if origin.strip()
+    ]
+    if csrf_origins:
+        CSRF_TRUSTED_ORIGINS = csrf_origins
+    else:
+        # Fallback: generate from ALLOWED_HOSTS
+        CSRF_TRUSTED_ORIGINS = [
+            f"https://{host}"
+            for host in ALLOWED_HOSTS
+            if host not in ("localhost", "127.0.0.1")
+        ]
+
     # HSTS settings
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True

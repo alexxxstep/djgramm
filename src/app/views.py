@@ -2,11 +2,13 @@
 
 import json
 import logging
+import time
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -28,6 +30,8 @@ from .forms import (
 )
 from .models import Comment, Follow, Like, Post, PostImage, Profile, Tag, User
 from .services import sync_post_tags
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Feed
@@ -74,9 +78,7 @@ class FeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = (
-                self.request.user.get_following_count()
-            )
+            context["following_count"] = self.request.user.get_following_count()
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -145,9 +147,7 @@ class NewsFeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = (
-                self.request.user.get_following_count()
-            )
+            context["following_count"] = self.request.user.get_following_count()
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -217,9 +217,7 @@ class ProfileView(DetailView):
 
         # Check if current user is following target user
         if self.request.user.is_authenticated:
-            context["is_following"] = self.request.user.is_following(
-                self.object
-            )
+            context["is_following"] = self.request.user.is_following(self.object)
         else:
             context["is_following"] = False
 
@@ -287,9 +285,7 @@ class FollowingListView(ListView):
         Optimized with select_related to avoid N+1 queries.
         """
         # Get target user from URL
-        self.target_user = get_object_or_404(
-            User, username=self.kwargs["username"]
-        )
+        self.target_user = get_object_or_404(User, username=self.kwargs["username"])
 
         # Return Follow objects with optimized queries
         return (
@@ -337,9 +333,7 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
         user = self.request.user
 
         # Get connected providers
-        connected_providers = set(
-            user.social_auth.values_list("provider", flat=True)
-        )
+        connected_providers = set(user.social_auth.values_list("provider", flat=True))
         context["connected_providers"] = connected_providers
 
         return context
@@ -352,6 +346,246 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
         """Show success message."""
         messages.success(self.request, "Profile updated successfully!")
         return super().form_valid(form)
+
+
+@login_required
+def delete_account(request):
+    """Allow user to delete their own account with email confirmation."""
+    # #region agent log
+    log_data = {
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "A",
+        "location": "views.py:361",
+        "message": "delete_account entry",
+        "data": {
+            "method": request.method,
+            "has_csrf": bool(request.POST.get("csrfmiddlewaretoken")),
+            "user_id": (request.user.pk if request.user.is_authenticated else None),
+        },
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        import os
+
+        log_path = ".cursor/debug.log"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except Exception as log_err:
+        # Fallback to Django logger
+        logger.debug(f"DEBUG LOG (A): {json.dumps(log_data)}")
+        logger.error(f"Failed to write debug log: {log_err}")
+    # #endregion
+
+    if request.method == "POST":
+        email_confirmation = request.POST.get("email_confirmation", "").strip()
+
+        # #region agent log
+        log_data_b = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "B",
+            "location": "views.py:385",
+            "message": "email validation check",
+            "data": {
+                "input_email": email_confirmation,
+                "expected_email": request.user.email,
+                "match": email_confirmation == request.user.email,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        try:
+            import os
+
+            log_path = ".cursor/debug.log"
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_data_b) + "\n")
+        except Exception as log_err:
+            logger.debug(f"DEBUG LOG (B): {json.dumps(log_data_b)}")
+            logger.error(f"Failed to write debug log: {log_err}")
+        # #endregion
+
+        # Validate email confirmation
+        if email_confirmation != request.user.email:
+            messages.error(
+                request,
+                "Email confirmation does not match. Please try again.",
+            )
+            return redirect("profile_edit")
+
+        # Store user info for logging
+        user_email = request.user.email
+        user_id = request.user.pk
+
+        logger.info(f"User self-deletion initiated: {user_email} (ID: {user_id})")
+
+        try:
+            # #region agent log
+            try:
+                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "debug-session",
+                                "runId": "run1",
+                                "hypothesisId": "C",
+                                "location": "views.py:383",
+                                "message": "before transaction",
+                                "data": {
+                                    "user_id": user_id,
+                                    "has_session": hasattr(request, "session"),
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+
+            with transaction.atomic():
+                # Get user instance
+                user = request.user
+
+                # #region agent log
+                try:
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:388",
+                                    "message": "before logout",
+                                    "data": {"user_id": user.pk},
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                # Logout user before deletion (prevents session errors)
+                logout(request)
+
+                # #region agent log
+                try:
+                    from .models import User
+
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:390",
+                                    "message": "after logout, before delete",
+                                    "data": {
+                                        "user_id": user.pk,
+                                        "user_exists": User.objects.filter(
+                                            pk=user.pk
+                                        ).exists(),
+                                    },
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                # Delete user (triggers pre_delete signal)
+                user.delete()
+
+                # #region agent log
+                try:
+                    from .models import User
+
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:391",
+                                    "message": "after delete",
+                                    "data": {
+                                        "user_id": user_id,
+                                        "user_exists": User.objects.filter(
+                                            pk=user_id
+                                        ).exists(),
+                                    },
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                logger.info(f"User self-deleted: {user_email} (ID: {user_id})")
+
+                # Add success message
+                messages.success(
+                    request,
+                    "Your account has been successfully deleted. "
+                    "We're sorry to see you go!",
+                )
+
+                # Redirect to home
+                return redirect("feed")
+
+        except Exception as e:
+            # #region agent log
+            try:
+                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "debug-session",
+                                "runId": "run1",
+                                "hypothesisId": "D",
+                                "location": "views.py:405",
+                                "message": "exception caught",
+                                "data": {
+                                    "error_type": type(e).__name__,
+                                    "error_message": str(e),
+                                    "user_id": (
+                                        user_id if "user_id" in locals() else None
+                                    ),
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+
+            logger.error(
+                f"Error during user self-deletion for {user_email}: {e}",
+                exc_info=True,
+            )
+            messages.error(
+                request,
+                "An error occurred while deleting your account. "
+                "Please try again or contact support.",
+            )
+            return redirect("profile_edit")
+
+    # GET request - redirect to profile edit (modal on that page)
+    return redirect("profile_edit")
 
 
 # =============================================================================
@@ -459,9 +693,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
                     f"Post {self.object.pk}: Saved image {img.pk} - order {img.order} - {img.image}"
                 )
                 if hasattr(img.image, "url"):
-                    logger.info(
-                        f"Post {self.object.pk}: Image URL: {img.image.url}"
-                    )
+                    logger.info(f"Post {self.object.pk}: Image URL: {img.image.url}")
         else:
             # If formset is invalid, show errors
             logger.error(
@@ -602,9 +834,7 @@ def toggle_follow(request, username):
     target_user = get_object_or_404(User, username=username)
 
     if request.user == target_user:
-        return JsonResponse(
-            {"error": "You cannot follow yourself"}, status=400
-        )
+        return JsonResponse({"error": "You cannot follow yourself"}, status=400)
 
     # ManyToManyField approach - simpler and more efficient
     if request.user.following.filter(id=target_user.id).exists():
@@ -641,9 +871,7 @@ def add_comment(request, pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -729,9 +957,7 @@ def edit_comment(request, pk, comment_pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse(
-                {"error": "Comment cannot be empty"}, status=400
-            )
+            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -772,9 +998,7 @@ def update_image_order(request, pk):
 
         # Update order for each image
         for index, image_id in enumerate(order_list):
-            PostImage.objects.filter(pk=image_id, post=post).update(
-                order=index
-            )
+            PostImage.objects.filter(pk=image_id, post=post).update(order=index)
 
         return JsonResponse({"success": True})
     except (json.JSONDecodeError, KeyError):
@@ -846,9 +1070,7 @@ def disconnect_oauth(request, provider):
     try:
         social_auth = UserSocialAuth.objects.get(user=user, provider=provider)
     except UserSocialAuth.DoesNotExist:
-        messages.error(
-            request, f"{provider_name} is not connected to your account."
-        )
+        messages.error(request, f"{provider_name} is not connected to your account.")
         return redirect("profile_edit")
 
     # Count available authentication methods
@@ -873,7 +1095,5 @@ def disconnect_oauth(request, provider):
 
     # Disconnect the provider
     social_auth.delete()
-    messages.success(
-        request, f"{provider_name} has been disconnected successfully."
-    )
+    messages.success(request, f"{provider_name} has been disconnected successfully.")
     return redirect("profile_edit")

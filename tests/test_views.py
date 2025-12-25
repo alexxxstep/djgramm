@@ -673,3 +673,139 @@ class TestFollowingListView:
             reverse("following_list", kwargs={"username": "nonexistent"})
         )
         assert response.status_code == 404
+
+
+class TestDeleteAccount:
+    """Tests for user self-deletion functionality."""
+
+    def test_delete_account_get_requires_login(self, client, db):
+        """Test that GET request requires authentication."""
+        response = client.get(reverse("delete_account"))
+        assert response.status_code == 302  # Redirect to login
+        assert "/login/" in response.url
+
+    def test_delete_account_post_requires_login(self, client, db):
+        """Test that POST request requires authentication."""
+        response = client.post(reverse("delete_account"))
+        assert response.status_code == 302  # Redirect to login
+        assert "/login/" in response.url
+
+    def test_delete_account_get_redirects_to_profile_edit(
+        self, authenticated_client
+    ):
+        """Test that GET request redirects to profile edit page."""
+        response = authenticated_client.get(reverse("delete_account"))
+        assert response.status_code == 302
+        assert response.url == reverse("profile_edit")
+
+    def test_delete_account_with_wrong_email(self, authenticated_client, user):
+        """Test that wrong email confirmation fails."""
+        response = authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": "wrong@example.com"},
+        )
+        assert response.status_code == 302  # Redirect to profile_edit
+        assert response.url == reverse("profile_edit")
+        # Verify user still exists
+        assert User.objects.filter(pk=user.pk).exists()
+
+    def test_delete_account_success(self, authenticated_client, user):
+        """Test successful account deletion."""
+        user_id = user.pk
+        user_email = user.email
+
+        # Delete account
+        response = authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": user_email},
+        )
+
+        # Verify redirect to feed
+        assert response.status_code == 302
+        assert response.url == reverse("feed")
+
+        # Verify user is deleted
+        assert not User.objects.filter(pk=user_id).exists()
+
+    def test_delete_account_with_posts(self, authenticated_client, user, post):
+        """Test deletion removes user's posts."""
+        user_id = user.pk
+        post_id = post.pk
+
+        # Verify post exists
+        assert Post.objects.filter(pk=post_id).exists()
+
+        # Delete account
+        authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": user.email},
+        )
+
+        # Verify user and post are deleted
+        assert not User.objects.filter(pk=user_id).exists()
+        assert not Post.objects.filter(pk=post_id).exists()
+
+    def test_delete_account_with_follow_relationships(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test deletion removes follow relationships."""
+        # Create follow relationships
+        user.following.add(user2)
+        user2.following.add(user)
+
+        user_id = user.pk
+
+        # Verify relationships exist
+        assert Follow.objects.filter(follower_id=user_id).exists()
+        assert Follow.objects.filter(following_id=user_id).exists()
+
+        # Delete account
+        authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": user.email},
+        )
+
+        # Verify relationships are deleted
+        assert not Follow.objects.filter(follower_id=user_id).exists()
+        assert not Follow.objects.filter(following_id=user_id).exists()
+
+    def test_delete_account_with_likes(
+        self, authenticated_client, user, user2, db
+    ):
+        """Test deletion removes user's likes."""
+        # Create post by user2
+        post = Post.objects.create(author=user2, caption="Test post")
+
+        # User likes the post
+        Like.objects.create(user=user, post=post)
+
+        user_id = user.pk
+
+        # Verify like exists
+        assert Like.objects.filter(user_id=user_id).exists()
+
+        # Delete account
+        authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": user.email},
+        )
+
+        # Verify like is deleted
+        assert not Like.objects.filter(user_id=user_id).exists()
+
+    def test_delete_account_logs_out_user(
+        self, authenticated_client, user, db
+    ):
+        """Test that user is logged out after deletion."""
+        # Delete account
+        authenticated_client.post(
+            reverse("delete_account"),
+            {"email_confirmation": user.email},
+        )
+
+        # Try to access protected page
+        response = authenticated_client.get(reverse("profile_edit"))
+
+        # Should redirect to login (user is logged out)
+        assert response.status_code == 302
+        assert "/login/" in response.url
