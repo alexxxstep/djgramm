@@ -56,9 +56,15 @@
                             </svg>
                         </button>
                         <a href="{% url 'profile' username=user.username %}" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors" title="Profile">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                            </svg>
+                            {% if user.profile.avatar %}
+                            <img src="{{ user.profile.avatar.url }}"
+                                 alt="{{ user.username }}"
+                                 class="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-gray-800">
+                            {% else %}
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-sm font-bold border-2 border-white dark:border-gray-800">
+                                {{ user.username|first|upper }}
+                            </div>
+                            {% endif %}
                         </a>
                         <form action="{% url 'logout' %}" method="post" class="inline">
                             {% csrf_token %}

@@ -19,11 +19,16 @@ urlpatterns = [
         name="login",
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
-    # Profile (edit MUST be before <username> pattern!)
+    # Profile (edit and delete MUST be before <username> pattern!)
     path(
         "profile/edit/",
         views.ProfileEditView.as_view(),
         name="profile_edit",
+    ),
+    path(
+        "profile/delete-account/",
+        views.delete_account,
+        name="delete_account",
     ),
     path(
         "profile/<str:username>/",

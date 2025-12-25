@@ -2,11 +2,13 @@
 
 import json
 import logging
+import time
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -28,6 +30,8 @@ from .forms import (
 )
 from .models import Comment, Follow, Like, Post, PostImage, Profile, Tag, User
 from .services import sync_post_tags
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Feed
@@ -352,6 +356,252 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
         """Show success message."""
         messages.success(self.request, "Profile updated successfully!")
         return super().form_valid(form)
+
+
+@login_required
+def delete_account(request):
+    """Allow user to delete their own account with email confirmation."""
+    # #region agent log
+    log_data = {
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "A",
+        "location": "views.py:361",
+        "message": "delete_account entry",
+        "data": {
+            "method": request.method,
+            "has_csrf": bool(request.POST.get("csrfmiddlewaretoken")),
+            "user_id": (
+                request.user.pk if request.user.is_authenticated else None
+            ),
+        },
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        import os
+
+        log_path = ".cursor/debug.log"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except Exception as log_err:
+        # Fallback to Django logger
+        logger.debug(f"DEBUG LOG (A): {json.dumps(log_data)}")
+        logger.error(f"Failed to write debug log: {log_err}")
+    # #endregion
+
+    if request.method == "POST":
+        email_confirmation = request.POST.get("email_confirmation", "").strip()
+
+        # #region agent log
+        log_data_b = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "B",
+            "location": "views.py:385",
+            "message": "email validation check",
+            "data": {
+                "input_email": email_confirmation,
+                "expected_email": request.user.email,
+                "match": email_confirmation == request.user.email,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        try:
+            import os
+
+            log_path = ".cursor/debug.log"
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_data_b) + "\n")
+        except Exception as log_err:
+            logger.debug(f"DEBUG LOG (B): {json.dumps(log_data_b)}")
+            logger.error(f"Failed to write debug log: {log_err}")
+        # #endregion
+
+        # Validate email confirmation
+        if email_confirmation != request.user.email:
+            messages.error(
+                request,
+                "Email confirmation does not match. Please try again.",
+            )
+            return redirect("profile_edit")
+
+        # Store user info for logging
+        user_email = request.user.email
+        user_id = request.user.pk
+
+        logger.info(
+            f"User self-deletion initiated: {user_email} (ID: {user_id})"
+        )
+
+        try:
+            # #region agent log
+            try:
+                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "debug-session",
+                                "runId": "run1",
+                                "hypothesisId": "C",
+                                "location": "views.py:383",
+                                "message": "before transaction",
+                                "data": {
+                                    "user_id": user_id,
+                                    "has_session": hasattr(request, "session"),
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+
+            with transaction.atomic():
+                # Get user instance
+                user = request.user
+
+                # #region agent log
+                try:
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:388",
+                                    "message": "before logout",
+                                    "data": {"user_id": user.pk},
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                # Logout user before deletion (prevents session errors)
+                logout(request)
+
+                # #region agent log
+                try:
+                    from .models import User
+
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:390",
+                                    "message": "after logout, before delete",
+                                    "data": {
+                                        "user_id": user.pk,
+                                        "user_exists": User.objects.filter(
+                                            pk=user.pk
+                                        ).exists(),
+                                    },
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                # Delete user (triggers pre_delete signal)
+                user.delete()
+
+                # #region agent log
+                try:
+                    from .models import User
+
+                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "debug-session",
+                                    "runId": "run1",
+                                    "hypothesisId": "C",
+                                    "location": "views.py:391",
+                                    "message": "after delete",
+                                    "data": {
+                                        "user_id": user_id,
+                                        "user_exists": User.objects.filter(
+                                            pk=user_id
+                                        ).exists(),
+                                    },
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                logger.info(f"User self-deleted: {user_email} (ID: {user_id})")
+
+                # Add success message
+                messages.success(
+                    request,
+                    "Your account has been successfully deleted. "
+                    "We're sorry to see you go!",
+                )
+
+                # Redirect to home
+                return redirect("feed")
+
+        except Exception as e:
+            # #region agent log
+            try:
+                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "debug-session",
+                                "runId": "run1",
+                                "hypothesisId": "D",
+                                "location": "views.py:405",
+                                "message": "exception caught",
+                                "data": {
+                                    "error_type": type(e).__name__,
+                                    "error_message": str(e),
+                                    "user_id": (
+                                        user_id
+                                        if "user_id" in locals()
+                                        else None
+                                    ),
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+
+            logger.error(
+                f"Error during user self-deletion for {user_email}: {e}",
+                exc_info=True,
+            )
+            messages.error(
+                request,
+                "An error occurred while deleting your account. "
+                "Please try again or contact support.",
+            )
+            return redirect("profile_edit")
+
+    # GET request - redirect to profile edit (modal on that page)
+    return redirect("profile_edit")
 
 
 # =============================================================================
