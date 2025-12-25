@@ -31,6 +31,16 @@ uv run python manage.py migrate --noinput
 # Collect static files (only in production)
 if [ "$DEBUG" != "True" ]; then
     echo "Collecting static files..."
+    # Remove Cloudinary static files to avoid permission errors
+    # Cloudinary files are served via CDN and don't need to be in staticfiles
+    if [ -d "/app/staticfiles/cloudinary" ]; then
+        echo "Removing Cloudinary static files..."
+        rm -rf /app/staticfiles/cloudinary || true
+    fi
+    # Fix permissions for staticfiles directory
+    if [ -d "/app/staticfiles" ]; then
+        chmod -R u+w /app/staticfiles 2>/dev/null || true
+    fi
     uv run python manage.py collectstatic --noinput
 fi
 

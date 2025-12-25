@@ -276,6 +276,14 @@ if static_dir.exists():
     STATICFILES_DIRS = list(STATICFILES_DIRS) + [static_dir]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Exclude Cloudinary static files from collectstatic
+# Cloudinary files are served via CDN and don't need to be collected
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    # Exclude cloudinary_storage finder to avoid permission errors
+]
+
 # WhiteNoise configuration
 # Disabled when nginx serves static files (production with nginx)
 # Enable only if Django serves static files directly (without nginx)

@@ -148,6 +148,12 @@ RUN echo "=== Verifying frontend/dist before collectstatic ===" && \
       echo "Available files in staticfiles:" && \
       ls -la /app/staticfiles/ | head -20 && \
       exit 1; \
+    fi && \
+    if [ -f "/app/staticfiles/icon.png" ]; then
+      ICON_SIZE=$(stat -c%s /app/staticfiles/icon.png 2>/dev/null || echo 0) && \
+      echo "✓ icon.png copied ($ICON_SIZE bytes)"; \
+    else
+      echo "WARNING: icon.png not found in staticfiles (favicon may not work)"; \
     fi
 
 # Switch to non-root user
