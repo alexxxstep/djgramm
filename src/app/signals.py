@@ -1,9 +1,13 @@
 """Django signals for DJGramm."""
 
+import logging
+
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from .models import Profile, User
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=User)
@@ -30,16 +34,54 @@ def save_user_profile(sender, instance, **kwargs):
 
 
 @receiver(pre_delete, sender=User)
-def cleanup_user_oauth(sender, instance, **kwargs):
-    """Clean up OAuth associations before user deletion."""
+def cleanup_user_data(sender, instance, **kwargs):
+    """Clean up user-related data before deletion."""
+    logger.info(
+        f"Starting cleanup for user: {instance.email} (ID: {instance.pk})"
+    )
+
     try:
+        # 1. Clean up Follow relationships explicitly
+        # This prevents potential CASCADE conflicts
+        from .models import Follow
+
+        followers_count = Follow.objects.filter(following=instance).count()
+        following_count = Follow.objects.filter(follower=instance).count()
+
+        logger.info(
+            f"User {instance.email} has {followers_count} followers "
+            f"and follows {following_count} users"
+        )
+
+        # Delete Follow relationships where user is follower
+        Follow.objects.filter(follower=instance).delete()
+        logger.info(f"Deleted {following_count} following relationships")
+
+        # Delete Follow relationships where user is being followed
+        Follow.objects.filter(following=instance).delete()
+        logger.info(f"Deleted {followers_count} follower relationships")
+
+    except Exception as e:
+        logger.error(
+            f"Error cleaning up Follow relationships for {instance.email}: {e}",
+            exc_info=True,
+        )
+
+    try:
+        # 2. Clean up OAuth associations
         from social_django.models import UserSocialAuth
 
-        # Delete all OAuth associations
-        UserSocialAuth.objects.filter(user=instance).delete()
+        oauth_count = UserSocialAuth.objects.filter(user=instance).count()
+        if oauth_count > 0:
+            UserSocialAuth.objects.filter(user=instance).delete()
+            logger.info(f"Deleted {oauth_count} OAuth associations")
+
     except ImportError:
-        # social_django not installed or not available
-        pass
-    except Exception:
-        # Ignore errors during cleanup
-        pass
+        logger.debug("social_django not installed")
+    except Exception as e:
+        logger.error(
+            f"Error cleaning up OAuth for {instance.email}: {e}",
+            exc_info=True,
+        )
+
+    logger.info(f"Cleanup completed for user: {instance.email}")

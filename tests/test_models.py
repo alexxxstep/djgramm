@@ -459,3 +459,140 @@ class TestUserUnreadNewsCount:
         Post.objects.create(author=user3, caption="Post from user3")
         # Should count both
         assert user.get_unread_news_count() == 2
+
+
+class TestUserDeletion:
+    """Tests for User deletion with proper cleanup."""
+
+    def test_delete_user_with_follow_relationships(self, user, user2, db):
+        """Test deleting user with Follow relationships."""
+        # Create Follow relationships
+        user.following.add(user2)  # user follows user2
+
+        user3 = User.objects.create_user(
+            username="user3",
+            email="user3@example.com",
+            password="testpass123",
+        )
+        user3.following.add(user)  # user3 follows user
+
+        # Verify relationships exist
+        assert user.following.count() == 1
+        assert user.followers.count() == 1
+        assert Follow.objects.filter(follower=user).count() == 1
+        assert Follow.objects.filter(following=user).count() == 1
+
+        user_id = user.pk
+
+        # Delete user
+        user.delete()
+
+        # Verify user is deleted
+        assert not User.objects.filter(pk=user_id).exists()
+
+        # Verify Follow relationships are cleaned up
+        assert Follow.objects.filter(follower_id=user_id).count() == 0
+        assert Follow.objects.filter(following_id=user_id).count() == 0
+
+        # Verify other users still exist
+        assert User.objects.filter(pk=user2.pk).exists()
+        assert User.objects.filter(pk=user3.pk).exists()
+
+    def test_delete_user_with_posts_and_likes(self, user, user2, post, db):
+        """Test deleting user cascades to posts and likes."""
+        # user2 likes user's post
+        Like.objects.create(user=user2, post=post)
+
+        # Create post by user2 that user likes
+        post2 = Post.objects.create(author=user2, caption="User2 post")
+        Like.objects.create(user=user, post=post2)
+
+        user_id = user.pk
+        post_id = post.pk
+
+        # Delete user
+        user.delete()
+
+        # Verify user and their posts are deleted (CASCADE)
+        assert not User.objects.filter(pk=user_id).exists()
+        assert not Post.objects.filter(pk=post_id).exists()
+
+        # Verify likes by deleted user are removed
+        assert not Like.objects.filter(user_id=user_id).exists()
+
+        # Verify user2's post still exists (only likes removed)
+        assert Post.objects.filter(pk=post2.pk).exists()
+        assert post2.likes.count() == 0  # user's like removed
+
+    def test_delete_user_with_comments(self, user, user2, post, db):
+        """Test deleting user cascades to their comments."""
+        from app.models import Comment
+
+        # user comments on user2's post
+        post2 = Post.objects.create(author=user2, caption="User2 post")
+        comment = Comment.objects.create(
+            author=user,
+            post=post2,
+            text="Nice post!",
+        )
+
+        comment_id = comment.pk
+
+        # Delete user
+        user.delete()
+
+        # Verify comment is deleted (CASCADE)
+        assert not Comment.objects.filter(pk=comment_id).exists()
+
+        # Verify user2 and their post still exist
+        assert User.objects.filter(pk=user2.pk).exists()
+        assert Post.objects.filter(pk=post2.pk).exists()
+
+    def test_bulk_delete_users_with_relationships(self, db):
+        """Test bulk deletion of users with Follow relationships."""
+        # Create 3 users
+        user1 = User.objects.create_user(
+            username="bulk1",
+            email="bulk1@example.com",
+            password="testpass123",
+        )
+        user2 = User.objects.create_user(
+            username="bulk2",
+            email="bulk2@example.com",
+            password="testpass123",
+        )
+        user3 = User.objects.create_user(
+            username="bulk3",
+            email="bulk3@example.com",
+            password="testpass123",
+        )
+
+        # Create relationships
+        user1.following.add(user2, user3)
+        user2.following.add(user1)
+        user3.following.add(user1, user2)
+
+        # Verify relationships
+        initial_follow_count = Follow.objects.count()
+        assert initial_follow_count == 5  # 1+1+2 = 5 relationships
+
+        user1_id = user1.pk
+        user2_id = user2.pk
+
+        # Bulk delete user1 and user2
+        User.objects.filter(pk__in=[user1_id, user2_id]).delete()
+
+        # Verify users deleted
+        assert not User.objects.filter(pk=user1_id).exists()
+        assert not User.objects.filter(pk=user2_id).exists()
+        assert User.objects.filter(pk=user3.pk).exists()
+
+        # Verify Follow relationships cleaned up
+        assert Follow.objects.filter(follower_id=user1_id).count() == 0
+        assert Follow.objects.filter(following_id=user1_id).count() == 0
+        assert Follow.objects.filter(follower_id=user2_id).count() == 0
+        assert Follow.objects.filter(following_id=user2_id).count() == 0
+
+        # user3 should have no relationships left
+        assert Follow.objects.filter(follower=user3).count() == 0
+        assert Follow.objects.filter(following=user3).count() == 0
