@@ -78,7 +78,9 @@ class FeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = self.request.user.get_following_count()
+            context["following_count"] = (
+                self.request.user.get_following_count()
+            )
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -147,7 +149,9 @@ class NewsFeedView(ListView):
                 self.request.user.following.values_list("id", flat=True)
             )
             # Get following count for empty feed message
-            context["following_count"] = self.request.user.get_following_count()
+            context["following_count"] = (
+                self.request.user.get_following_count()
+            )
         else:
             context["user_liked_posts"] = set()
             context["user_following_ids"] = set()
@@ -217,7 +221,9 @@ class ProfileView(DetailView):
 
         # Check if current user is following target user
         if self.request.user.is_authenticated:
-            context["is_following"] = self.request.user.is_following(self.object)
+            context["is_following"] = self.request.user.is_following(
+                self.object
+            )
         else:
             context["is_following"] = False
 
@@ -285,7 +291,9 @@ class FollowingListView(ListView):
         Optimized with select_related to avoid N+1 queries.
         """
         # Get target user from URL
-        self.target_user = get_object_or_404(User, username=self.kwargs["username"])
+        self.target_user = get_object_or_404(
+            User, username=self.kwargs["username"]
+        )
 
         # Return Follow objects with optimized queries
         return (
@@ -333,7 +341,9 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
         user = self.request.user
 
         # Get connected providers
-        connected_providers = set(user.social_auth.values_list("provider", flat=True))
+        connected_providers = set(
+            user.social_auth.values_list("provider", flat=True)
+        )
         context["connected_providers"] = connected_providers
 
         return context
@@ -361,7 +371,9 @@ def delete_account(request):
         "data": {
             "method": request.method,
             "has_csrf": bool(request.POST.get("csrfmiddlewaretoken")),
-            "user_id": (request.user.pk if request.user.is_authenticated else None),
+            "user_id": (
+                request.user.pk if request.user.is_authenticated else None
+            ),
         },
         "timestamp": int(time.time() * 1000),
     }
@@ -419,7 +431,9 @@ def delete_account(request):
         user_email = request.user.email
         user_id = request.user.pk
 
-        logger.info(f"User self-deletion initiated: {user_email} (ID: {user_id})")
+        logger.info(
+            f"User self-deletion initiated: {user_email} (ID: {user_id})"
+        )
 
         try:
             # #region agent log
@@ -561,7 +575,9 @@ def delete_account(request):
                                     "error_type": type(e).__name__,
                                     "error_message": str(e),
                                     "user_id": (
-                                        user_id if "user_id" in locals() else None
+                                        user_id
+                                        if "user_id" in locals()
+                                        else None
                                     ),
                                 },
                                 "timestamp": int(time.time() * 1000),
@@ -693,7 +709,9 @@ class PostCreateView(LoginRequiredMixin, CreateView):
                     f"Post {self.object.pk}: Saved image {img.pk} - order {img.order} - {img.image}"
                 )
                 if hasattr(img.image, "url"):
-                    logger.info(f"Post {self.object.pk}: Image URL: {img.image.url}")
+                    logger.info(
+                        f"Post {self.object.pk}: Image URL: {img.image.url}"
+                    )
         else:
             # If formset is invalid, show errors
             logger.error(
@@ -834,7 +852,9 @@ def toggle_follow(request, username):
     target_user = get_object_or_404(User, username=username)
 
     if request.user == target_user:
-        return JsonResponse({"error": "You cannot follow yourself"}, status=400)
+        return JsonResponse(
+            {"error": "You cannot follow yourself"}, status=400
+        )
 
     # ManyToManyField approach - simpler and more efficient
     if request.user.following.filter(id=target_user.id).exists():
@@ -871,7 +891,9 @@ def add_comment(request, pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
+            return JsonResponse(
+                {"error": "Comment cannot be empty"}, status=400
+            )
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -957,7 +979,9 @@ def edit_comment(request, pk, comment_pk):
         text = data.get("text", "").strip()
 
         if not text:
-            return JsonResponse({"error": "Comment cannot be empty"}, status=400)
+            return JsonResponse(
+                {"error": "Comment cannot be empty"}, status=400
+            )
 
         if len(text) > 500:
             return JsonResponse({"error": "Comment too long"}, status=400)
@@ -998,7 +1022,9 @@ def update_image_order(request, pk):
 
         # Update order for each image
         for index, image_id in enumerate(order_list):
-            PostImage.objects.filter(pk=image_id, post=post).update(order=index)
+            PostImage.objects.filter(pk=image_id, post=post).update(
+                order=index
+            )
 
         return JsonResponse({"success": True})
     except (json.JSONDecodeError, KeyError):
@@ -1070,7 +1096,9 @@ def disconnect_oauth(request, provider):
     try:
         social_auth = UserSocialAuth.objects.get(user=user, provider=provider)
     except UserSocialAuth.DoesNotExist:
-        messages.error(request, f"{provider_name} is not connected to your account.")
+        messages.error(
+            request, f"{provider_name} is not connected to your account."
+        )
         return redirect("profile_edit")
 
     # Count available authentication methods
@@ -1095,5 +1123,7 @@ def disconnect_oauth(request, provider):
 
     # Disconnect the provider
     social_auth.delete()
-    messages.success(request, f"{provider_name} has been disconnected successfully.")
+    messages.success(
+        request, f"{provider_name} has been disconnected successfully."
+    )
     return redirect("profile_edit")
